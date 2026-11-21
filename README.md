@@ -1,8 +1,8 @@
-# Reference-Anchored Partial-Charge Battery Health Estimation
+# Cross-Protocol State-of-Health Estimation of Lithium-Ion Batteries from Reference-Anchored Partial Charging
 
 Reproducibility package for the *Journal of Energy Storage* manuscript:
 
-> **Reference-anchored partial-charge battery health estimation: response calibration and two-measurement adaptation**  
+> **Cross-protocol state-of-health estimation of lithium-ion batteries from reference-anchored partial charging: Response calibration, rank-one Bayesian adaptation, and transfer limits**  
 > Le Huy Hoang (`lhhoang@dut.udn.vn`)  
 > Faculty of Electrical Engineering, University of Science and Technology, The University of Danang, Vietnam
 
