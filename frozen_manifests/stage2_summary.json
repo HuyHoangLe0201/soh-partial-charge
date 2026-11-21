@@ -1,0 +1,322 @@
+{
+  "clean_b5_means_pp": {
+    "best_segment": 7.183671872101521,
+    "carry_last": 6.016382400547973,
+    "covariance_exact": 8.757853167751605,
+    "cycle_trend": 12.23734366096646,
+    "endpoint_secant": 7.43755610865907,
+    "isotropic_map": 5.521722768805873,
+    "primary": 5.392867055010688,
+    "scalar_map": 5.221428703981697,
+    "source_logridge": 5.370803210529549,
+    "target_secant": 7.179073993356088
+  },
+  "counts": {
+    "cal_cycles_per_cell": {
+      "XJTU_B1::2C_battery-1": 5.0,
+      "XJTU_B1::2C_battery-2": 5.0,
+      "XJTU_B1::2C_battery-3": 5.0,
+      "XJTU_B1::2C_battery-4": 5.0,
+      "XJTU_B1::2C_battery-5": 5.0,
+      "XJTU_B1::2C_battery-6": 5.0,
+      "XJTU_B1::2C_battery-7": 5.0,
+      "XJTU_B1::2C_battery-8": 5.0,
+      "XJTU_B2::3C_battery-10_c01": 5.0,
+      "XJTU_B2::3C_battery-11_c02": 5.0,
+      "XJTU_B2::3C_battery-12_c03": 5.0,
+      "XJTU_B2::3C_battery-13_c04": 5.0,
+      "XJTU_B2::3C_battery-14_c05": 5.0,
+      "XJTU_B2::3C_battery-15_c06": 5.0,
+      "XJTU_B2::3C_battery-1_c00": 5.0,
+      "XJTU_B2::3C_battery-2_c07": 5.0,
+      "XJTU_B2::3C_battery-3_c08": 5.0,
+      "XJTU_B2::3C_battery-4_c09": 5.0,
+      "XJTU_B2::3C_battery-5_c10": 5.0,
+      "XJTU_B2::3C_battery-6_c11": 5.0,
+      "XJTU_B2::3C_battery-7_c12": 5.0,
+      "XJTU_B2::3C_battery-8_c13": 5.0,
+      "XJTU_B2::3C_battery-9_c14": 5.0,
+      "XJTU_B3::R2.5_battery-1_c00": 5.0,
+      "XJTU_B3::R2.5_battery-2_c01": 5.0,
+      "XJTU_B3::R2.5_battery-3_c02": 5.0,
+      "XJTU_B3::R2.5_battery-4_c03": 5.0,
+      "XJTU_B3::R2.5_battery-5_c04": 5.0,
+      "XJTU_B3::R2.5_battery-6_c05": 5.0,
+      "XJTU_B3::R2.5_battery-7_c06": 5.0,
+      "XJTU_B3::R2.5_battery-8_c07": 5.0,
+      "XJTU_B4::R3_battery-1_c00": 30.0,
+      "XJTU_B4::R3_battery-2_c01": 30.0,
+      "XJTU_B4::R3_battery-3_c02": 30.0,
+      "XJTU_B4::R3_battery-4_c03": 30.0,
+      "XJTU_B4::R3_battery-5_c04": 30.0,
+      "XJTU_B4::R3_battery-6_c05": 30.0,
+      "XJTU_B4::R3_battery-7_c06": 30.0,
+      "XJTU_B4::R3_battery-8_c07": 30.0,
+      "XJTU_B5::RW_battery-1_c00": 65.0,
+      "XJTU_B5::RW_battery-2_c01": 65.0,
+      "XJTU_B5::RW_battery-3_c02": 65.0,
+      "XJTU_B5::RW_battery-4_c03": 76.0,
+      "XJTU_B5::RW_battery-5_c04": 65.0,
+      "XJTU_B5::RW_battery-6_c05": 65.0,
+      "XJTU_B5::RW_battery-7_c06": 65.0,
+      "XJTU_B5::RW_battery-8_c07": 65.0,
+      "XJTU_B6::Sim_satellite_battery-1_c00": 29.0,
+      "XJTU_B6::Sim_satellite_battery-2_c01": 29.0,
+      "XJTU_B6::Sim_satellite_battery-3_c02": 29.0,
+      "XJTU_B6::Sim_satellite_battery-4_c03": 29.0,
+      "XJTU_B6::Sim_satellite_battery-5_c04": 29.0,
+      "XJTU_B6::Sim_satellite_battery-6_c05": 29.0,
+      "XJTU_B6::Sim_satellite_battery-7_c06": 29.0,
+      "XJTU_B6::Sim_satellite_battery-8_c07": 29.0
+    },
+    "cohort_ncells": {
+      "XJTU_B1": 8,
+      "XJTU_B2": 15,
+      "XJTU_B3": 8,
+      "XJTU_B4": 8,
+      "XJTU_B5": 8,
+      "XJTU_B6": 8
+    },
+    "methods": 10,
+    "scenarios": [
+      "clean",
+      "vp5",
+      "vm5",
+      "vp10",
+      "vm10"
+    ],
+    "unique_profiles": 13653
+  },
+  "gate": {
+    "all_passed": false,
+    "best_segment_clean_mean_pp": 7.183671872101521,
+    "check_best_segment": true,
+    "check_isomap": false,
+    "check_target_secant": true,
+    "confirmation_passed": false,
+    "isomap_clean_mean_pp": 5.521722768805873,
+    "primary_clean_mean_pp": 5.392867055010688,
+    "target_secant_clean_mean_pp": 7.179073993356088,
+    "threshold_pp": 0.9
+  },
+  "note": "B1 nested LOCO vs B2/B3/B4/B6 frozen development vs B5 once confirmation; primary must beat comparator mean MAE by gate; paired bootstrap over cells with seed 20261107.",
+  "paired_summary_keys": 45,
+  "receipts": {
+    "confirmation": {
+      "cells": [
+        "RW_battery-1_c00",
+        "RW_battery-2_c01",
+        "RW_battery-3_c02",
+        "RW_battery-4_c03",
+        "RW_battery-5_c04",
+        "RW_battery-6_c05",
+        "RW_battery-7_c06",
+        "RW_battery-8_c07"
+      ],
+      "models": [
+        "best_segment",
+        "carry_last",
+        "covariance_exact",
+        "cycle_trend",
+        "endpoint_secant",
+        "isotropic_map",
+        "primary",
+        "scalar_map",
+        "source_logridge",
+        "target_secant"
+      ],
+      "rows": 6550,
+      "scenarios": [
+        "clean",
+        "vm10",
+        "vm5",
+        "vp10",
+        "vp5"
+      ]
+    },
+    "development": {
+      "cells": [
+        "3C_battery-10_c01",
+        "3C_battery-11_c02",
+        "3C_battery-12_c03",
+        "3C_battery-13_c04",
+        "3C_battery-14_c05",
+        "3C_battery-15_c06",
+        "3C_battery-1_c00",
+        "3C_battery-2_c07",
+        "3C_battery-3_c08",
+        "3C_battery-4_c09",
+        "3C_battery-5_c10",
+        "3C_battery-6_c11",
+        "3C_battery-7_c12",
+        "3C_battery-8_c13",
+        "3C_battery-9_c14",
+        "R2.5_battery-1_c00",
+        "R2.5_battery-2_c01",
+        "R2.5_battery-3_c02",
+        "R2.5_battery-4_c03",
+        "R2.5_battery-5_c04",
+        "R2.5_battery-6_c05",
+        "R2.5_battery-7_c06",
+        "R2.5_battery-8_c07",
+        "R3_battery-1_c00",
+        "R3_battery-2_c01",
+        "R3_battery-3_c02",
+        "R3_battery-4_c03",
+        "R3_battery-5_c04",
+        "R3_battery-6_c05",
+        "R3_battery-7_c06",
+        "R3_battery-8_c07",
+        "Sim_satellite_battery-1_c00",
+        "Sim_satellite_battery-2_c01",
+        "Sim_satellite_battery-3_c02",
+        "Sim_satellite_battery-4_c03",
+        "Sim_satellite_battery-5_c04",
+        "Sim_satellite_battery-6_c05",
+        "Sim_satellite_battery-7_c06",
+        "Sim_satellite_battery-8_c07"
+      ],
+      "models": [
+        "best_segment",
+        "carry_last",
+        "covariance_exact",
+        "cycle_trend",
+        "endpoint_secant",
+        "isotropic_map",
+        "primary",
+        "scalar_map",
+        "source_logridge",
+        "target_secant"
+      ],
+      "rows": 517550,
+      "scenarios": [
+        "clean",
+        "vm10",
+        "vm5",
+        "vp10",
+        "vp5"
+      ]
+    },
+    "loco": {
+      "cells": [
+        "2C_battery-1",
+        "2C_battery-2",
+        "2C_battery-3",
+        "2C_battery-4",
+        "2C_battery-5",
+        "2C_battery-6",
+        "2C_battery-7",
+        "2C_battery-8"
+      ],
+      "models": [
+        "best_segment",
+        "carry_last",
+        "covariance_exact",
+        "cycle_trend",
+        "endpoint_secant",
+        "isotropic_map",
+        "primary",
+        "scalar_map",
+        "source_logridge",
+        "target_secant"
+      ],
+      "rows": 31710,
+      "scenarios": [
+        "clean"
+      ]
+    }
+  },
+  "table_clean_records": [
+    {
+      "XJTU_B1": 1.3711343950615975,
+      "XJTU_B2": 10.774794700437875,
+      "XJTU_B3": 2.0666529915455225,
+      "XJTU_B4": 2.6269833555463786,
+      "XJTU_B5": 5.392867055010688,
+      "XJTU_B6": 15.218508132655183,
+      "model": "primary"
+    },
+    {
+      "XJTU_B1": 1.34841160984945,
+      "XJTU_B2": 8.770493682599342,
+      "XJTU_B3": 2.054169122124016,
+      "XJTU_B4": 2.6265920287151188,
+      "XJTU_B5": 5.521722768805873,
+      "XJTU_B6": 13.591353523257181,
+      "model": "isotropic_map"
+    },
+    {
+      "XJTU_B1": 4.075167709721794,
+      "XJTU_B2": 3.6941726912123967,
+      "XJTU_B3": 4.735609405457735,
+      "XJTU_B4": 7.385442399988361,
+      "XJTU_B5": 7.179073993356088,
+      "XJTU_B6": 4.8698922893368835,
+      "model": "target_secant"
+    },
+    {
+      "XJTU_B1": 4.027015557724951,
+      "XJTU_B2": 3.672657902069797,
+      "XJTU_B3": 4.679763344482954,
+      "XJTU_B4": 8.725742731605951,
+      "XJTU_B5": 7.43755610865907,
+      "XJTU_B6": 4.406310907262365,
+      "model": "endpoint_secant"
+    },
+    {
+      "XJTU_B1": 1.3745825767281812,
+      "XJTU_B2": 13.985253440227313,
+      "XJTU_B3": 2.072547884997915,
+      "XJTU_B4": 2.63268687854728,
+      "XJTU_B5": 5.370803210529549,
+      "XJTU_B6": 16.080512785309054,
+      "model": "source_logridge"
+    },
+    {
+      "XJTU_B1": 1.3526136447677124,
+      "XJTU_B2": 4.007038157850574,
+      "XJTU_B3": 2.07256862433206,
+      "XJTU_B4": 2.713744023289355,
+      "XJTU_B5": 5.221428703981697,
+      "XJTU_B6": 6.682847591563215,
+      "model": "scalar_map"
+    },
+    {
+      "XJTU_B1": 4.485930394416217,
+      "XJTU_B2": 3.698008609858936,
+      "XJTU_B3": 4.797560803898557,
+      "XJTU_B4": 5.004656735407979,
+      "XJTU_B5": 6.016382400547973,
+      "XJTU_B6": 4.8362568069837915,
+      "model": "carry_last"
+    },
+    {
+      "XJTU_B1": 49.78466430983163,
+      "XJTU_B2": 44.23860183854293,
+      "XJTU_B3": 109.417990818031,
+      "XJTU_B4": 54.396003290466204,
+      "XJTU_B5": 12.23734366096646,
+      "XJTU_B6": 48.631403351216925,
+      "model": "cycle_trend"
+    },
+    {
+      "XJTU_B1": 1.4155220918808038,
+      "XJTU_B2": 5.20780743131514,
+      "XJTU_B3": 2.0977929794002264,
+      "XJTU_B4": 3.411408821744061,
+      "XJTU_B5": 8.757853167751605,
+      "XJTU_B6": 8.33175294119688,
+      "model": "covariance_exact"
+    },
+    {
+      "XJTU_B1": 3.3205228980772774,
+      "XJTU_B2": 3.2882962570657677,
+      "XJTU_B3": 3.9676521644190488,
+      "XJTU_B4": 4.909528238043167,
+      "XJTU_B5": 7.183671872101521,
+      "XJTU_B6": 4.403081041362102,
+      "model": "best_segment"
+    }
+  ],
+  "units": "relative_capacity_pp"
+}

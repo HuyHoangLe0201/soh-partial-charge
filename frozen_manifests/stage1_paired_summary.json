@@ -1,0 +1,797 @@
+{
+  "protocols": [
+    "XJTU_B4",
+    "XJTU_B6"
+  ],
+  "scenario_map": {
+    "clean": 0,
+    "vp5": 5,
+    "vm5": -5,
+    "vp10": 10,
+    "vm10": -10
+  },
+  "n_cells_per_protocol_target": 8,
+  "comparisons": {
+    "clean": {
+      "absridge": {
+        "bootstrap": {
+          "mean_pp": 5.721351698510324,
+          "ci95_pp": [
+            5.4572795181090985,
+            5.990419753288345
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -0.2383207285362351,
+            "n_cells": 8,
+            "wins_primary": 5,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 11.681024125556885,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "anchor_constant": {
+        "bootstrap": {
+          "mean_pp": 6.569515957097052,
+          "ci95_pp": [
+            6.244661720412561,
+            6.902411120423673
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -1.037579220250352,
+            "n_cells": 8,
+            "wins_primary": 7,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 14.176611134444455,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "best_segment": {
+        "bootstrap": {
+          "mean_pp": 6.437167013303621,
+          "ci95_pp": [
+            6.164764040415506,
+            6.717169871711645
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -0.9217952844438194,
+            "n_cells": 8,
+            "wins_primary": 7,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 13.796129311051061,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "clean_selector": {
+        "bootstrap": {
+          "mean_pp": -0.4074498594648536,
+          "ci95_pp": [
+            -0.46810823992377615,
+            -0.3398166307777216
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": 0.1871673877651146,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": -1.002067106694822,
+            "n_cells": 8,
+            "wins_primary": 8,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "endpoint": {
+        "bootstrap": {
+          "mean_pp": 4.546399001847362,
+          "ci95_pp": [
+            4.08345287001494,
+            4.982903088464329
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -0.7712844563559966,
+            "n_cells": 8,
+            "wins_primary": 6,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 9.86408246005072,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "histgb": {
+        "bootstrap": {
+          "mean_pp": 6.318886224825933,
+          "ci95_pp": [
+            6.0016396641326635,
+            6.638401418315783
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -1.5388386847925888,
+            "n_cells": 8,
+            "wins_primary": 8,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 14.176611134444455,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "logridge": {
+        "bootstrap": {
+          "mean_pp": 1.2654678981670324,
+          "ci95_pp": [
+            1.1939825336442247,
+            1.345379669972224
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": 0.07915367104750995,
+            "n_cells": 8,
+            "wins_primary": 4,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 2.4517821252865546,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "no_heterogeneity": {
+        "bootstrap": {
+          "mean_pp": 0.0,
+          "ci95_pp": [
+            0.0,
+            0.0
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": 0.0,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 0.0,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "rawridge": {
+        "bootstrap": {
+          "mean_pp": 4.5565293925035535,
+          "ci95_pp": [
+            4.350753851748502,
+            4.761966166220537
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -0.0906829699859882,
+            "n_cells": 8,
+            "wins_primary": 5,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 9.203741754993095,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "simplex": {
+        "bootstrap": {
+          "mean_pp": 5.999807372332784,
+          "ci95_pp": [
+            5.624209461391466,
+            6.369644099957633
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -1.9620157507667026,
+            "n_cells": 8,
+            "wins_primary": 8,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 13.96163049543227,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "uncalibrated": {
+        "bootstrap": {
+          "mean_pp": 1.7549209626127853,
+          "ci95_pp": [
+            1.673754976831063,
+            1.8441443799136519
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": 0.009339798261429359,
+            "n_cells": 8,
+            "wins_primary": 5,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 3.500502126964142,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "uniform": {
+        "bootstrap": {
+          "mean_pp": 5.554795656057407,
+          "ci95_pp": [
+            5.136022597560991,
+            5.963431550574117
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -0.5031430798134396,
+            "n_cells": 8,
+            "wins_primary": 7,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 11.612734391928253,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "unit_sum": {
+        "bootstrap": {
+          "mean_pp": -3.367650175180095,
+          "ci95_pp": [
+            -3.787014597669569,
+            -2.9370916935260927
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -4.302402300547992,
+            "n_cells": 8,
+            "wins_primary": 8,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": -2.4328980498121986,
+            "n_cells": 8,
+            "wins_primary": 8,
+            "in_bootstrap": true
+          }
+        }
+      },
+      "without_nuisance": {
+        "bootstrap": {
+          "mean_pp": 3.6549013858668835,
+          "ci95_pp": [
+            3.5508249272402854,
+            3.7675815926800507
+          ],
+          "n_protocols": 2,
+          "n_cells_by_protocol": {
+            "XJTU_B4": 8,
+            "XJTU_B6": 8
+          },
+          "n_boot": 20000,
+          "seed": 20261107,
+          "note": "equal-weight protocol means; percentile95 CI descriptive"
+        },
+        "protocol_specific": {
+          "XJTU_B4": {
+            "mean_diff_pp": -0.4892577594020408,
+            "n_cells": 8,
+            "wins_primary": 8,
+            "in_bootstrap": true
+          },
+          "XJTU_B6": {
+            "mean_diff_pp": 7.799060531135808,
+            "n_cells": 8,
+            "wins_primary": 0,
+            "in_bootstrap": true
+          }
+        }
+      }
+    },
+    "minus5mV": {
+      "absridge": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "anchor_constant": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "best_segment": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "clean_selector": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "endpoint": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "histgb": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "logridge": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "no_heterogeneity": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "rawridge": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "simplex": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "uncalibrated": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "uniform": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "unit_sum": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "without_nuisance": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      }
+    },
+    "plus5mV": {
+      "absridge": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "anchor_constant": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "best_segment": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "clean_selector": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "endpoint": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "histgb": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "logridge": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "no_heterogeneity": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "rawridge": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "simplex": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "uncalibrated": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "uniform": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "unit_sum": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      },
+      "without_nuisance": {
+        "bootstrap": {
+          "mean_pp": null,
+          "ci95_pp": [
+            null,
+            null
+          ],
+          "n_protocols": 0
+        },
+        "protocol_specific": {},
+        "note": "no protocol with exactly n=8 cells; bootstrap skipped"
+      }
+    }
+  },
+  "bootstrap_config": {
+    "n_boot": 20000,
+    "seed": 20261107,
+    "note": "resample per protocol only when n==8; equal-weight protocol mean; percentile95 descriptive"
+  }
+}
