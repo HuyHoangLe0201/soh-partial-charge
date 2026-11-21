@@ -7,6 +7,7 @@ and writes exclusively to revision_experiments/.
 """
 from __future__ import annotations
 
+import argparse
 import itertools
 import json
 import math
@@ -26,13 +27,26 @@ from scipy.signal import savgol_filter
 from scipy.stats import binomtest, wilcoxon
 from sklearn.model_selection import GroupKFold
 
-ROOT = Path(r"d:\bách khoa Đà Nẵng\nghiencuukhoahoc\baotri\SOH\work\paper_method_research_20261107")
+_DEFAULT_ROOT = Path(os.environ.get("SOH_WORK_ROOT", str(Path(__file__).resolve().parent.parent)))
+ROOT = _DEFAULT_ROOT
 OLD_DATA = ROOT.parent / "paper_research_expansion_20261107" / "data"
 NEW_DATA = ROOT / "data"
 OUT = ROOT / "revision_experiments"
-OUT.mkdir(parents=True, exist_ok=True)
 
-sys.path.insert(0, str(ROOT))
+def _configure_paths(work_root: Path) -> None:
+    global ROOT, OLD_DATA, NEW_DATA, OUT
+    ROOT = work_root.resolve()
+    OLD_DATA = ROOT.parent / "paper_research_expansion_20261107" / "data"
+    NEW_DATA = ROOT / "data"
+    OUT = ROOT / "revision_experiments"
+    OUT.mkdir(parents=True, exist_ok=True)
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+
+if str(ROOT / "src") not in sys.path and (ROOT / "src").exists():
+    sys.path.insert(0, str(ROOT / "src"))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 import reference_models as ref  # noqa: E402
 import stage2_run as s2  # noqa: E402
 
@@ -1084,6 +1098,15 @@ def run_e6(datasets: Dict[str, List[ref.Cell]]) -> Dict[str, Any]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Run isolated post-hoc revision audits E1-E6.")
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=ROOT,
+        help="Working root containing data/results/stage2 (default: SOH_WORK_ROOT env or repo parent).",
+    )
+    args = parser.parse_args()
+    _configure_paths(args.root)
     t0 = time.time()
     datasets = load_all_datasets()
     e1 = run_e1()

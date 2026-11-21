@@ -7,6 +7,7 @@ Strictly read-only on raw files; outputs exclusively to revision_experiments/.
 """
 from __future__ import annotations
 
+import argparse
 import gc
 import json
 import math
@@ -21,10 +22,9 @@ import pandas as pd
 import scipy.io as sio
 from scipy.signal import savgol_filter
 
-ROOT = Path(r"d:\bách khoa Đà Nẵng\nghiencuukhoahoc\baotri\SOH\work\paper_method_research_20261107")
-RAW_BASE = Path(r"D:/bách khoa Đà Nẵng/nghiencuukhoahoc/baotri/data/NASABattery/Battery Dataset")
+ROOT = Path(os.environ.get("SOH_WORK_ROOT", str(Path(__file__).resolve().parent.parent)))
+RAW_BASE = Path(os.environ.get("SOH_RAW_BASE", str(ROOT / "raw_data")))
 OUT = ROOT / "revision_experiments"
-OUT.mkdir(parents=True, exist_ok=True)
 
 VFULL = np.round(np.linspace(3.20, 4.18, 99), 4)  # 0.01 V grid
 
@@ -300,6 +300,15 @@ def audit_cell_mat(label: str, mat_rel: str, ch_range: Tuple[float, float], targ
 
 
 def main() -> None:
+    global ROOT, RAW_BASE, OUT
+    parser = argparse.ArgumentParser(description="Run E3b raw .mat RPT preconditioning and ICA audit.")
+    parser.add_argument("--root", type=Path, default=ROOT, help="Working root (default: SOH_WORK_ROOT env or repo parent).")
+    parser.add_argument("--raw-base", type=Path, default=RAW_BASE, help="Raw XJTU Batch-* directory (default: SOH_RAW_BASE).")
+    args = parser.parse_args()
+    ROOT = args.root.resolve()
+    RAW_BASE = args.raw_base.resolve()
+    OUT = ROOT / "revision_experiments"
+    OUT.mkdir(parents=True, exist_ok=True)
     targets = [
         ("B1_2C_1", "Batch-1/2C_battery-1.mat", (3.0, 4.8), -2.0, None),
         ("B4_R3_1", "Batch-4/R3_battery-1.mat", (3.0, 4.8), -2.0, ROOT / "data" / "cells" / "B4" / "R3_battery-1.mat".replace(".mat", ".npz")),
