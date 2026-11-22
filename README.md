@@ -35,7 +35,7 @@ Both predeclared 10% superiority gates failed without post-hoc model switching:
 | **Stage 1: XJTU B4** (8 cells, R3) | `primary`: **2.522** | `logridge`: 2.443, `anchor_constant`: 3.560, `endpoint`: 3.294 | `+29.1%` skill vs `anchor_constant` |
 | **Stage 1: XJTU B6** (8 cells, Sat) | `primary`: **17.791** | `anchor_constant`: **3.615**, `endpoint`: 7.927, `logridge`: 15.340 | Extrapolation inversion (`+17.696` pp bias) |
 | **Stage 1: B4/B6 Mean** (16 cells) | `primary`: **10.157** | `anchor_constant`: **3.587**, `endpoint`: 5.610, `logridge`: 8.891 | **Fail** ($\ge 10\%$ reduction missed) |
-| **Stage 2: XJTU B5** (8 cells, RW) | `primary`: **5.393** | `scalar_map`: **5.221**, `source_logridge`: 5.371, `isotropic_map`: 5.522, `target_secant`: 7.179 | **Fail** vs `isotropic_map` (`-2.33%`) |
+| **Stage 2: XJTU B5** (8 cells, RW) | `primary`: **5.393** | `scalar_map`: **5.221**, `source_logridge`: 5.371, `isotropic_map`: 5.522, `target_secant`: 7.179 | **Fail** vs `isotropic_map` (`+2.33%` error reduction) |
 
 Post-hoc audits E1–E6 (`revision_experiments/`) demonstrate that: (E1) no learned Stage-1 estimator beats `anchor_constant` on the B4/B6 mean; (E2/E4) `scalar_map`'s apparent Stage-2 leverage disappears under matched prior scaling (`t_eff = 165.3` / `956.7`) or extended grid tuning (`t** = 100`); (E3) B6 $D_0$ expansion reflects odd/even partial-discharge RPT preconditioning (`+19.7%` step jump), logged cell-surface cooling (`4.4–6.2 °C`), CV-charge growth (`+41–58%`), and within-branch positive polarization drift (`+20` to `+50 mV`); and (E5) B5 rankings invert across cells (`0/8` wins for `primary`, exact $p_{\mathrm{perm}}=0.0078$) at cell-specific post-rebound oracle indices (`9–15`, vs. non-significant `2/8–3/8` at fixed `a=10`).
 
