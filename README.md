@@ -2,7 +2,7 @@
 
 Reproducibility package for the *Journal of Energy Storage* manuscript:
 
-> **Cross-protocol state-of-health estimation of lithium-ion batteries from reference-anchored partial charging: Response calibration, rank-one Bayesian adaptation, and transfer limits**  
+> **Cross-protocol state-of-health estimation of lithium-ion batteries from reference-anchored partial charging**  
 > Le Huy Hoang (`lhhoang@dut.udn.vn`)  
 > Faculty of Electrical Engineering, University of Science and Technology, The University of Danang, Vietnam
 
