@@ -1,5 +1,5 @@
 {
-  "root": "D:\\b\u00e1ch khoa \u0110\u00e0 N\u1eb5ng\\nghiencuukhoahoc\\baotri\\SOH\\work\\paper_method_research_20261107",
+  "root": ".",
   "units": "SOH fraction; pp = 100 * fraction",
   "validation": {
     "recomputed_metrics_match_saved_within": 2e-08,
@@ -22073,7 +22073,7 @@
   },
   "primary_metadata": {
     "available": true,
-    "path": "D:\\b\u00e1ch khoa \u0110\u00e0 N\u1eb5ng\\nghiencuukhoahoc\\baotri\\SOH\\work\\paper_method_research_20261107\\results\\source_XJTU_B1\\config_freeze.json",
+    "path": "results/source_XJTU_B1/config_freeze.json",
     "model_payload": {
       "kind": "response",
       "mode": "calibrated",
@@ -22377,7 +22377,7 @@
   },
   "existing_confirmation_success_criterion": {
     "found": true,
-    "path": "D:\\b\u00e1ch khoa \u0110\u00e0 N\u1eb5ng\\nghiencuukhoahoc\\baotri\\SOH\\work\\paper_method_research_20261107\\results\\confirmation\\confirmation_summary.json",
+    "path": "results/confirmation/confirmation_summary.json",
     "success_criterion": null,
     "top_level_keys": [
       "G_scale_meta",
@@ -22400,7 +22400,7 @@
     ]
   },
   "source_cv": {
-    "path": "D:\\b\u00e1ch khoa \u0110\u00e0 N\u1eb5ng\\nghiencuukhoahoc\\baotri\\SOH\\work\\paper_method_research_20261107\\results\\source_XJTU_B1\\source_cv_summary.csv",
+    "path": "results/source_XJTU_B1/source_cv_summary.csv",
     "note": "selected score, NOT unbiased validation"
   },
   "figures": [

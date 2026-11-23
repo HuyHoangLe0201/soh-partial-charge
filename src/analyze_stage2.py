@@ -15,7 +15,8 @@ SCENARIOS = ['clean', 'vp5', 'vm5', 'vp10', 'vm10']
 STRESS = SCENARIOS[1:]
 STAGES = ['loco', 'development', 'confirmation']
 
-P = Path(__file__).resolve().parent
+_SRC_DIR = Path(__file__).resolve().parent
+P = _SRC_DIR.parent if _SRC_DIR.name == 'src' else _SRC_DIR
 OUT = P / 'analysis_stage2'
 FIG = OUT / 'figures'
 OUT.mkdir(parents=True, exist_ok=True)

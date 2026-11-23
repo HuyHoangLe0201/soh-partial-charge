@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import prepare_confirmation_data as base  # noqa: E402
 
 # --- B5 paths & spec (B5 only; runtime patch allowed) -------------------------
-RAW_B5_DIR = Path(r"D:/bách khoa Đà Nẵng/nghiencuukhoahoc/baotri/data/NASABattery/Battery Dataset/Batch-5")
+RAW_B5_DIR = base.RAW_BASE_DIR / "Batch-5"
 
 B5 = dict(
     dir=RAW_B5_DIR,
@@ -132,10 +132,15 @@ def parse_cell(ci, stem, mat_path, code_hash):
 
 
 def main() -> None:
-    global LOG_FH
+    global LOG_FH, RAW_B5_DIR
     ap = argparse.ArgumentParser(description="Parse XJTU Batch-5 raw .mat into NPZ.")
     ap.add_argument("--force", action="store_true", help="ignore per-cell cache (still overwrites)")
+    ap.add_argument("--raw-dir", type=Path, default=None, help="base directory containing Batch-5/ (or XJTU_RAW_DIR env)")
     args = ap.parse_args()
+
+    if args.raw_dir is not None:
+        RAW_B5_DIR = args.raw_dir.resolve() / "Batch-5"
+        B5["dir"] = RAW_B5_DIR
 
     base.ensure_dirs()
     base.LOG_DIR.mkdir(parents=True, exist_ok=True)

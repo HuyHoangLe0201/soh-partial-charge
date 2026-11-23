@@ -2,18 +2,18 @@
   "freeze_schema": 1,
   "stage": "source",
   "source_dataset": "XJTU_B1",
-  "source_npz_path": "D:\\b\u00e1ch khoa \u0110\u00e0 N\u1eb5ng\\nghiencuukhoahoc\\baotri\\SOH\\work\\paper_research_expansion_20261107\\data\\XJTU_B1.npz",
+  "source_npz_path": "data/XJTU_B1.npz",
   "source_npz_sha256": "d0299e3de301f67d51d0af34ef0d0de70d17a7780e647e7fce89e9d9857b56e2",
   "code_files": {
-    "reference_models.py": "D:\\b\u00e1ch khoa \u0110\u00e0 N\u1eb5ng\\nghiencuukhoahoc\\baotri\\SOH\\work\\paper_method_research_20261107\\reference_models.py",
-    "method_run.py": "D:\\b\u00e1ch khoa \u0110\u00e0 N\u1eb5ng\\nghiencuukhoahoc\\baotri\\SOH\\work\\paper_method_research_20261107\\method_run.py",
-    "response_method_spec.txt": "D:\\b\u00e1ch khoa \u0110\u00e0 N\u1eb5ng\\nghiencuukhoahoc\\baotri\\SOH\\work\\paper_method_research_20261107\\response_method_spec.txt"
+    "reference_models.py": "src/reference_models.py",
+    "method_run.py": "src/method_run.py",
+    "response_method_spec.txt": "specs/response_method_spec.txt"
   },
-  "code_sha256": "b022bc24f54dac6970770d2b0a27b917c375e9598d2b626cb55ee1aa474cf11f",
+  "code_sha256": "763abf8ce4f19a34db5c2e89a6dac0bffa6c2957f6d72857850ef22d05b0af84",
   "library_sha256": "354095bd4000bf1c9eb4ab036780c1ecd87b6ad6b9303088ca818060c4d61584",
-  "runner_sha256": "543fd2aac97032cce77f159d227e966906ad70d890da11242c9427c68504d879",
+  "runner_sha256": "9dea8a45d37f5ce0ee2590f5df29f0c927d15966608182f0b676037038630f1e",
   "spec_sha256": "6396f56e254c2f5f4fd163bb6552bdee02e4d9f38e45b20450e1643296eedb5e",
-  "engine_contract_sha256": "234a03ef62b0096e8018be1eefa36574efb1e9f993ead4d9de30354f17b83398",
+  "engine_contract_sha256": "5e3055e44dd870e3b3aced46aa4a1ed7798d7bce0803a88b403e081aea1ae0e2",
   "kinds": [
     "primary",
     "without_nuisance",

@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soh-partial-charge"
+version = "1.0.0"
+description = "Reference-anchored partial-charge state-of-health (SOH) estimation library and reproducibility package."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Le Huy Hoang", email = "lhhoang@dut.udn.vn" },
+]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "scipy>=1.14",
+  "scikit-learn>=1.5",
+  "joblib>=1.4",
+  "matplotlib>=3.8",
+  "threadpoolctl>=3.5",
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["soh_partial_charge*", "src*"]
+
+[tool.setuptools.package-data]
+soh_partial_charge = ["pretrained_xjtu_b1.json"]

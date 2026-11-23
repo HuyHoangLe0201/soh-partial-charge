@@ -12,10 +12,17 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent
+_SRC_DIR = Path(__file__).resolve().parent
+ROOT = _SRC_DIR.parent if _SRC_DIR.name == "src" else _SRC_DIR
 RESULTS = ROOT / "results"
 ANALYSIS = ROOT / "analysis"
 FIGDIR = ANALYSIS / "figures"
+
+def _rel_path(p: Path) -> str:
+    try:
+        return p.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return p.name
 
 TO_PP = 100.0
 TOL = 2e-8
@@ -397,14 +404,15 @@ def bootstrap_protocol_equal(diffs_by_proto: Dict[str, np.ndarray], n_boot: int,
 
 def extract_primary_metadata() -> Dict:
     p = RESULTS / "source_XJTU_B1" / "config_freeze.json"
+    rp = _rel_path(p)
     if not p.exists():
-        return {"available": False, "path": str(p), "error": "missing"}
+        return {"available": False, "path": rp, "error": "missing"}
     try:
         cfg = json.loads(p.read_text(encoding="utf-8"))
     except Exception as e:
-        return {"available": False, "path": str(p), "error": f"parse failed: {e}"}
+        return {"available": False, "path": rp, "error": f"parse failed: {e}"}
     if not isinstance(cfg, dict):
-        return {"available": True, "path": str(p), "model_payload": None, "note": "cfg is not a dict"}
+        return {"available": True, "path": rp, "model_payload": None, "note": "cfg is not a dict"}
     payload = cfg.get("model_payloads", {}).get("primary")
     if payload is None and "primary" in cfg and isinstance(cfg["primary"], dict):
         payload = cfg["primary"]
@@ -412,22 +420,23 @@ def extract_primary_metadata() -> Dict:
         numeric = {k: finite_or_none(v) for k, v in payload.items() if isinstance(v, (int, float)) and not isinstance(v, bool)}
     else:
         numeric = {}
-    return {"available": True, "path": str(p), "model_payload": payload, "model_numeric": numeric}
+    return {"available": True, "path": rp, "model_payload": payload, "model_numeric": numeric}
 
 
 def read_confirmation_success_criterion() -> Dict:
     p = RESULTS / "confirmation" / "confirmation_summary.json"
     if not p.exists():
         p = RESULTS / "confirmation" / "summary.json"
+    rp = _rel_path(p)
     if not p.exists():
         return {"found": False, "note": "No confirmation_summary.json; screen computed independently."}
     try:
         obj = json.loads(p.read_text(encoding="utf-8"))
     except Exception as e:
-        return {"found": True, "path": str(p), "error": f"parse failed: {e}"}
+        return {"found": True, "path": rp, "error": f"parse failed: {e}"}
     if not isinstance(obj, dict):
-        return {"found": True, "path": str(p), "error": "top-level JSON is not an object"}
-    return {"found": True, "path": str(p), "success_criterion": obj.get("success_criterion"), "top_level_keys": sorted(obj.keys())}
+        return {"found": True, "path": rp, "error": "top-level JSON is not an object"}
+    return {"found": True, "path": rp, "success_criterion": obj.get("success_criterion"), "top_level_keys": sorted(obj.keys())}
 
 
 def main() -> None:
@@ -637,7 +646,7 @@ def main() -> None:
 
     # ---- Summary ----
     summary = {
-        "root": str(ROOT),
+        "root": ".",
         "units": "SOH fraction; pp = 100 * fraction",
         "validation": {
             "recomputed_metrics_match_saved_within": TOL,
@@ -660,7 +669,7 @@ def main() -> None:
         "screening": screen,
         "primary_metadata": extract_primary_metadata(),
         "existing_confirmation_success_criterion": existing_criterion,
-        "source_cv": {"path": str(RESULTS / "source_XJTU_B1" / "source_cv_summary.csv"),
+        "source_cv": {"path": _rel_path(RESULTS / "source_XJTU_B1" / "source_cv_summary.csv"),
                       "note": "selected score, NOT unbiased validation"},
         "figures": [
             "analysis/figures/fig1_clean_cellmean_mae.pdf/.png",

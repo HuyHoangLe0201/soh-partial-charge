@@ -29,14 +29,14 @@ from sklearn.model_selection import GroupKFold
 
 _DEFAULT_ROOT = Path(os.environ.get("SOH_WORK_ROOT", str(Path(__file__).resolve().parent.parent)))
 ROOT = _DEFAULT_ROOT
-OLD_DATA = ROOT.parent / "paper_research_expansion_20261107" / "data"
+OLD_DATA = ROOT / "data"
 NEW_DATA = ROOT / "data"
 OUT = ROOT / "revision_experiments"
 
 def _configure_paths(work_root: Path) -> None:
     global ROOT, OLD_DATA, NEW_DATA, OUT
     ROOT = work_root.resolve()
-    OLD_DATA = ROOT.parent / "paper_research_expansion_20261107" / "data"
+    OLD_DATA = ROOT / "data"
     NEW_DATA = ROOT / "data"
     OUT = ROOT / "revision_experiments"
     OUT.mkdir(parents=True, exist_ok=True)

@@ -6,11 +6,11 @@
     "not_worse_than_source_selected_best_segment": true,
     "descriptive_not_statistical": true
   },
-  "b1_npz": "XJTU_B1.npz",
+  "b1_npz": "data/XJTU_B1.npz",
   "b1_sha256": "d0299e3de301f67d51d0af34ef0d0de70d17a7780e647e7fce89e9d9857b56e2",
   "code_sha256": {
-    "stage2_run.py": "9ba35790ee9dced8b97f3b7dbd3340cba9a959261f4d62609bb1f4d83d5ba41a",
-    "stage2_spec.txt": "a393aafcf729169d4f14800056ffa8fef26e519b23e3a3ab817dcbd819fd6bc7",
+    "stage2_run.py": "da6ab2b5e96dc63364afcd69c6c00e673aa210acdf1b188b7a8e828d39837473",
+    "stage2_spec.txt": "060bf24247e96db0ccebb598528f1fa463127b6e690ec50995457fbb95657ac0",
     "reference_models.py": "354095bd4000bf1c9eb4ab036780c1ecd87b6ad6b9303088ca818060c4d61584"
   },
   "models": {

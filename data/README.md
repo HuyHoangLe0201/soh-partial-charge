@@ -51,15 +51,19 @@ Recorded SHA-256 digests of the 7 prepared `.npz` files used in the study:
 
 ---
 
-## Expected Directory Layout for Frozen Runners
+## Expected Directory Layout
 
-To preserve exact byte-for-byte SHA-256 parity with `frozen_manifests/stage1_config_freeze.json` and `frozen_manifests/stage2_config_freeze.json`, the scripts in `src/` are unmodified from the executed confirmation run. When executing from a sandbox root `<WORKDIR>`:
+Place all seven prepared `.npz` archives directly inside `data/`:
 
-- `<WORKDIR>/work/paper_method_research_20261107/` — copy `src/*.py` and `specs/*.txt` here (plus `revision_experiments/` if running E1–E6)
-- `<WORKDIR>/work/paper_research_expansion_20261107/data/`:
-  - `NASA.npz`, `XJTU_B1.npz`, `XJTU_B2.npz`, `XJTU_B3.npz`
-- `<WORKDIR>/work/paper_method_research_20261107/data/`:
-  - `XJTU_B2.npz`, `XJTU_B3.npz`, `XJTU_B4.npz`, `XJTU_B5.npz`, `XJTU_B6.npz`
-  *(Note: `method_run.py` reads `XJTU_B2`/`B3` from `paper_method_research_20261107/data/`, whereas `stage2_run.py` and `run_revision_experiments.py` read them from `paper_research_expansion_20261107/data/`, so place copies in both directories.)*
+- `data/NASA.npz`
+- `data/XJTU_B1.npz`, `data/XJTU_B2.npz`, `data/XJTU_B3.npz`
+- `data/XJTU_B4.npz`, `data/XJTU_B5.npz`, `data/XJTU_B6.npz`
 
-Use `src/prepare_confirmation_data.py` (for `XJTU_B4` and `XJTU_B6`) and `src/prepare_batch5_data.py` (for `XJTU_B5`) on raw XJTU `.mat` archives (updating the `RAW_B*_DIR` path on a local working copy if your download path differs). For `NASA.npz` and `XJTU_B1..B3.npz`, construct archives matching the schema above from the original NASA `.mat` files and XJTU Zenodo `Batch-1`–`Batch-3` `.mat` files.
+To generate `XJTU_B4.npz`, `XJTU_B6.npz`, and `XJTU_B5.npz` from the downloaded raw XJTU Zenodo `.mat` folders (`Batch-4/`, `Batch-5/`, `Batch-6/`), run from the repository root:
+
+```bash
+python src/prepare_confirmation_data.py --raw-dir "<PATH_TO_RAW_XJTU_DIR>"
+python src/prepare_batch5_data.py --raw-dir "<PATH_TO_RAW_XJTU_DIR>"
+```
+
+(Alternatively, set the environment variable `XJTU_RAW_DIR="<PATH_TO_RAW_XJTU_DIR>"` or place the raw `Batch-*` folders under `raw_data/XJTU/`.) For `NASA.npz` and `XJTU_B1.npz`–`XJTU_B3.npz`, construct archives matching the schema above from the original NASA `.mat` files and XJTU Zenodo `Batch-1`–`Batch-3` `.mat` files.

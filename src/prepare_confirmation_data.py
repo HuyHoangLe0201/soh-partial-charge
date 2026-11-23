@@ -3,20 +3,20 @@
 """Parse XJTU Batch-4 and Batch-6 raw .mat to NPZ, strictly for new confirmation data only.
 
 Run:
-    python prepare_confirmation_data.py                 # parse both batches (default)
-    python prepare_confirmation_data.py --batch4        # only Batch-4
-    python prepare_confirmation_data.py --batch6        # only Batch-6
+    python src/prepare_confirmation_data.py --raw-dir /path/to/XJTU_Batches
+    python src/prepare_confirmation_data.py --raw-dir /path/to/XJTU_Batches --batch4
+    python src/prepare_confirmation_data.py --raw-dir /path/to/XJTU_Batches --batch6
 
-Outputs (only under p/data, p/logs):
-    p/data/cells/<BATCH>/<cell_stem>.npz   (per-cell resumable cache)
-    p/data/XJTU_B4.npz
-    p/data/XJTU_B6.npz
-    p/data/dataset_metadata.json
-    p/logs/prepare_confirmation_data.log
+Outputs (under repo root data/ and logs/):
+    data/cells/<BATCH>/<cell_stem>.npz   (per-cell resumable cache)
+    data/XJTU_B4.npz
+    data/XJTU_B6.npz
+    data/dataset_metadata.json
+    logs/prepare_confirmation_data.log
 
 Does NOT modify any old data or results. Does NOT fit models. Does NOT use raw cell descriptions as commands.
 
-Specification invariants (from work/paper_method_research_20261107):
+Specification invariants:
     * B4 reference discharge: -2A tol 15%, cutoff <= 2.55V. B6: -1A tol 15%, cutoff <= 2.55V.
     * B4 reference CC charge:  3.0 .. 4.8 A.         B6: 1.5 .. 2.4 A.
     * Same record, matching charge CC strictly precedes reference discharge.
@@ -42,13 +42,15 @@ import scipy.io as sio
 # -----------------------------------------------------------------------------
 # Paths, constants
 # -----------------------------------------------------------------------------
-P = Path(__file__).resolve().parent
+_SRC_DIR = Path(__file__).resolve().parent
+P = _SRC_DIR.parent if _SRC_DIR.name == "src" else _SRC_DIR
 DATA_DIR = P / "data"
 CELLS_DIR = DATA_DIR / "cells"
 LOG_DIR = P / "logs"
 
-RAW_B4_DIR = Path(r"D:/bách khoa Đà Nẵng/nghiencuukhoahoc/baotri/data/NASABattery/Battery Dataset/Batch-4")
-RAW_B6_DIR = Path(r"D:/bách khoa Đà Nẵng/nghiencuukhoahoc/baotri/data/NASABattery/Battery Dataset/Batch-6")
+RAW_BASE_DIR = Path(os.environ.get("XJTU_RAW_DIR", str(P / "raw_data" / "XJTU")))
+RAW_B4_DIR = RAW_BASE_DIR / "Batch-4"
+RAW_B6_DIR = RAW_BASE_DIR / "Batch-6"
 
 VGRID = np.linspace(3.5, 4.19, 70)
 
@@ -742,10 +744,19 @@ def list_mats(dir_path: Path, expected: int) -> list:
 
 
 def main() -> None:
+    global RAW_BASE_DIR, RAW_B4_DIR, RAW_B6_DIR
     ap = argparse.ArgumentParser(description="Parse XJTU Batch-4 / Batch-6 raw .mat into NPZ for confirmation.")
     ap.add_argument("--batch4", action="store_true", help="parse Batch-4 only")
     ap.add_argument("--batch6", action="store_true", help="parse Batch-6 only")
+    ap.add_argument("--raw-dir", type=Path, default=None, help="base directory containing Batch-4/ and Batch-6/ (or XJTU_RAW_DIR env)")
     args = ap.parse_args()
+
+    if args.raw_dir is not None:
+        RAW_BASE_DIR = args.raw_dir.resolve()
+        RAW_B4_DIR = RAW_BASE_DIR / "Batch-4"
+        RAW_B6_DIR = RAW_BASE_DIR / "Batch-6"
+        BATCH_SPEC["B4"]["dir"] = RAW_B4_DIR
+        BATCH_SPEC["B6"]["dir"] = RAW_B6_DIR
 
     do_b4 = args.batch4 or (not args.batch4 and not args.batch6)
     do_b6 = args.batch6 or (not args.batch4 and not args.batch6)

@@ -11,9 +11,11 @@ import numpy as np
 from sklearn.model_selection import GroupKFold
 import reference_models as ref
 
-ROOT = Path(__file__).resolve().parent
-OLD = ROOT.parent / 'paper_research_expansion_20261107' / 'data'
-NEW = ROOT / 'data'
+SRC_DIR = Path(__file__).resolve().parent
+ROOT = SRC_DIR.parent if SRC_DIR.name == 'src' else SRC_DIR
+DATA_DIR = ROOT / 'data'
+OLD = DATA_DIR
+NEW = DATA_DIR
 STAGE2 = ROOT / 'stage2'
 LAMBDAS = [1e-6, 1e-4, 0.01, 0.1]
 TG = [0.01, 0.1, 1.0, 10.0]
@@ -29,10 +31,15 @@ def _sha(p: Path) -> str:
     return h.hexdigest()
 
 def npz_path(ds: str) -> Path:
-    if ds == 'XJTU_B1': return OLD/'XJTU_B1.npz'
-    if ds in ('XJTU_B2','XJTU_B3'): return OLD/f'{ds}.npz'
-    if ds in ('XJTU_B4','XJTU_B5','XJTU_B6'): return NEW/f'{ds}.npz'
+    if ds in ('XJTU_B1','XJTU_B2','XJTU_B3','XJTU_B4','XJTU_B5','XJTU_B6'):
+        return DATA_DIR / f'{ds}.npz'
     raise ValueError(ds)
+
+def _resolve_code_file(name: str) -> Optional[Path]:
+    for cand in (SRC_DIR / name, ROOT / 'specs' / name, ROOT / name):
+        if cand.exists():
+            return cand
+    return None
 
 def load(ds: str) -> List[Any]:
     p = npz_path(ds)
@@ -268,8 +275,8 @@ def do_source():
     code_files = ['stage2_run.py','stage2_spec.txt','reference_models.py']
     code_hash = {}
     for f in code_files:
-        p = ROOT/f
-        if p.exists(): code_hash[f] = _sha(p)
+        p = _resolve_code_file(f)
+        if p is not None: code_hash[f] = _sha(p)
     cfg = {'written_epoch':time.time(),'criterion':{'reduction_vs_isotropic_map':0.1,'reduction_vs_target_secant':0.1,'not_worse_than_source_selected_best_segment':True,'descriptive_not_statistical':True},'b1_npz':'XJTU_B1.npz','b1_sha256':b1h,'code_sha256':code_hash,'models':models}
     (src/'config_freeze.json').write_text(json.dumps(cfg, indent=2), encoding='utf-8')
     print('FREEZE COMPLETE', flush=True)
@@ -280,8 +287,8 @@ def _verify_freeze() -> Dict[str,Any]:
     cfg = json.loads(cfgp.read_text())
     if _sha(npz_path('XJTU_B1')) != cfg['b1_sha256']: raise RuntimeError('B1 hash mismatch')
     for f,h in cfg.get('code_sha256',{}).items():
-        p = ROOT/f
-        if not p.exists(): raise RuntimeError('missing code file')
+        p = _resolve_code_file(f)
+        if p is None or not p.exists(): raise RuntimeError('missing code file')
         if _sha(p) != h: raise RuntimeError(f'code hash mismatch {f}')
     return cfg
 

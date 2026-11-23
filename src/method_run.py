@@ -18,6 +18,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+_SRC_DIR = Path(__file__).resolve().parent
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
+
 from reference_models import (
     load_cells, fit, predict, select, audit_source,
     gain_cancel_assert, anchor_exact_assert,
@@ -26,7 +30,7 @@ from reference_models import (
 
 
 # ---------------- paths & constants ----------------
-ROOT_DEFAULT = Path.cwd()
+ROOT_DEFAULT = _SRC_DIR.parent if _SRC_DIR.name == 'src' else Path.cwd()
 DS_OLD = "XJTU_B1"
 DS_NEW_DEV = ["XJTU_B2", "XJTU_B3"]
 DS_NEW_CONF = ["XJTU_B4", "XJTU_B6"]
@@ -126,32 +130,40 @@ def _parse_args() -> argparse.Namespace:
 
 
 # ---------------- path helpers ----------------
+def _rel(path: Path, root: Path) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.name
+
+
 def _paths(root: Path) -> Dict[str, Path]:
-    p = root / 'work' / 'paper_method_research_20261107'
-    old = root / 'work' / 'paper_research_expansion_20261107'
+    src_dir = root / 'src' if (root / 'src').exists() else root
+    spec_dir = root / 'specs' if (root / 'specs').exists() else root
+    data_dir = root / 'data'
     return {
         'root': root,
-        'p': p,
-        'old': old,
-        'out': p / 'results',
-        'data_new': p / 'data',
-        'data_old': old / 'data',
-        'library': p / 'reference_models.py',
-        'runner': p / 'method_run.py',
-        'spec': p / 'response_method_spec.txt',
-        'engine_contract': p / 'engine_contract.txt',
+        'p': root,
+        'old': root,
+        'out': root / 'results',
+        'data_new': data_dir,
+        'data_old': data_dir,
+        'library': src_dir / 'reference_models.py',
+        'runner': src_dir / 'method_run.py',
+        'spec': spec_dir / 'response_method_spec.txt',
+        'engine_contract': spec_dir / 'engine_contract.txt',
     }
 
 
 def _ds_paths(paths: Dict[str, Path], source: str) -> Dict[str, Path]:
-    old = paths['data_old']; new = paths['data_new']
+    data_dir = paths['data_old']
     return {
-        'XJTU_B1': old / 'XJTU_B1.npz',
-        'NASA': old / 'NASA.npz',
-        'XJTU_B2': new / 'XJTU_B2.npz',
-        'XJTU_B3': new / 'XJTU_B3.npz',
-        'XJTU_B4': new / 'XJTU_B4.npz',
-        'XJTU_B6': new / 'XJTU_B6.npz',
+        'XJTU_B1': data_dir / 'XJTU_B1.npz',
+        'NASA': data_dir / 'NASA.npz',
+        'XJTU_B2': data_dir / 'XJTU_B2.npz',
+        'XJTU_B3': data_dir / 'XJTU_B3.npz',
+        'XJTU_B4': data_dir / 'XJTU_B4.npz',
+        'XJTU_B6': data_dir / 'XJTU_B6.npz',
     }
 
 
@@ -292,9 +304,9 @@ def stage_source(args, paths: Dict[str, Path]) -> Dict[str, Any]:
         'freeze_schema': 1,
         'stage': 'source',
         'source_dataset': args.source,
-        'source_npz_path': str(src_path),
+        'source_npz_path': _rel(src_path, paths['root']),
         'source_npz_sha256': source_npz_hash,
-        'code_files': {p.name: str(p) for p in [paths['library'], paths['runner'], paths['spec']]},
+        'code_files': {p.name: _rel(p, paths['root']) for p in [paths['library'], paths['runner'], paths['spec']]},
         'code_sha256': source_code_hash,
         'library_sha256': _sha256_file(paths['library']),
         'runner_sha256': _sha256_file(paths['runner']),
@@ -598,14 +610,14 @@ def stage_confirmation(args, paths: Dict[str, Path]) -> Dict[str, Any]:
     receipt = {
         'stage': 'confirmation',
         'source': source,
-        'freeze_json': str(freeze_fp),
+        'freeze_json': _rel(freeze_fp, paths['root']),
         'freeze_code_sha256': fz.get('code_sha256'),
         'source_npz_sha256': fz.get('source_npz_sha256'),
         'model_joblib_sha256': fz.get('model_joblib_sha256'),
         'chosen_params': fz.get('chosen_params'),
         'success_criterion': fz.get('success_criterion'),
         'Gscale_meta': fz.get('Gscale_meta'),
-        'target_files': {ds: str(ds_paths[ds]) for ds in DS_NEW_CONF},
+        'target_files': {ds: _rel(ds_paths[ds], paths['root']) for ds in DS_NEW_CONF},
         'target_files_exist_precheck': {ds: ds_paths[ds].exists() for ds in DS_NEW_CONF},
         'started_at_epoch_s': time.time(),
     }
@@ -630,7 +642,7 @@ def stage_confirmation(args, paths: Dict[str, Path]) -> Dict[str, Any]:
     summary = {
         'stage': 'confirmation',
         'source': source,
-        'freeze_json': str(freeze_fp),
+        'freeze_json': _rel(freeze_fp, paths['root']),
         'freeze_code_sha256': fz.get('code_sha256'),
         'source_npz_sha256': fz.get('source_npz_sha256'),
         'target_dataset_sha256': {ds: _sha256_file(ds_paths[ds]) for ds in DS_NEW_CONF},
@@ -649,9 +661,9 @@ def stage_confirmation(args, paths: Dict[str, Path]) -> Dict[str, Any]:
         'note': 'Descriptive results only; criterion_met is mechanical; no post-hoc retuning; this file is immutable protocol record.',
     }
     _dump_json(out / 'confirmation_summary.json', summary)
-    _dump_json(complete_fp, {'complete': True, 'summary': str(out / 'confirmation_summary.json'),
+    _dump_json(complete_fp, {'complete': True, 'summary': _rel(out / 'confirmation_summary.json', paths['root']),
                              'finished_at_epoch_s': time.time()})
-    return {'summary': str(out / 'confirmation_summary.json'), 'criterion_met': criterion_eval['criterion_met']}
+    return {'summary': _rel(out / 'confirmation_summary.json', paths['root']), 'criterion_met': criterion_eval['criterion_met']}
 
 
 # ---------------- stage: loco ----------------
@@ -667,7 +679,7 @@ def stage_loco(args, paths: Dict[str, Path]) -> Dict[str, Any]:
     fold_cfg = {
         'stage': 'loco',
         'source': source,
-        'source_npz_path': str(fp),
+        'source_npz_path': _rel(fp, paths['root']),
         'source_npz_sha256': _sha256_file(fp),
         'code_sha256': _code_hash([paths['library'], paths['runner'], paths['spec']]),
         'kinds': list(KINDS),
