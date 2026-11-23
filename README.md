@@ -15,8 +15,8 @@ This repository provides two cleanly integrated components:
 ## 1. Installation (Library & Reproducibility Environment)
 
 ```bash
-git clone <YOUR_GITHUB_REPO_URL>
-cd <REPO_DIR>
+git clone https://github.com/HuyHoangLe0201/soh-partial-charge.git
+cd soh-partial-charge
 
 python -m venv .venv
 source .venv/bin/activate        # Windows PowerShell: .venv\Scripts\Activate.ps1

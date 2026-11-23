@@ -29,6 +29,10 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 
+[project.urls]
+Homepage = "https://github.com/HuyHoangLe0201/soh-partial-charge"
+Repository = "https://github.com/HuyHoangLe0201/soh-partial-charge"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["soh_partial_charge*", "src*"]
