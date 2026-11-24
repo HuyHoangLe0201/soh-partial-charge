@@ -78,9 +78,9 @@
       "flash_bytes_f32": 36,
       "sram_bytes_f32": 64,
       "flops_per_cycle": 17,
-      "python_api_median_us": 43.08935000153724,
-      "python_api_iqr_us": 20.603700017090887,
-      "vector_kernel_median_us": 3.879879997111857
+      "python_api_median_us": 27.09020000474993,
+      "python_api_iqr_us": 2.5949499977286905,
+      "vector_kernel_median_us": 3.6143000004813075
     },
     {
       "component": "Stage-1 + Projector Gate",
@@ -88,8 +88,8 @@
       "flash_bytes_f32": 172,
       "sram_bytes_f32": 128,
       "flops_per_cycle": 75,
-      "python_api_median_us": 120.15906667026381,
-      "python_api_iqr_us": 12.58733333088459,
+      "python_api_median_us": 106.1858666750292,
+      "python_api_iqr_us": 15.115133312065154,
       "vector_kernel_median_us": null
     },
     {
@@ -98,8 +98,8 @@
       "flash_bytes_f32": 128,
       "sram_bytes_f32": 192,
       "flops_per_cycle": 92,
-      "python_api_median_us": 60.71433333757644,
-      "python_api_iqr_us": 7.811066655752562,
+      "python_api_median_us": 46.296066662762314,
+      "python_api_iqr_us": 4.7240666463039815,
       "vector_kernel_median_us": null
     },
     {
@@ -108,8 +108,8 @@
       "flash_bytes_f32": 128,
       "sram_bytes_f32": 192,
       "flops_per_cycle": 64,
-      "python_api_median_us": 172.9654999799095,
-      "python_api_iqr_us": 23.040000000037253,
+      "python_api_median_us": 149.5481000165455,
+      "python_api_iqr_us": 10.228499973891303,
       "vector_kernel_median_us": null
     },
     {
@@ -118,10 +118,20 @@
       "flash_bytes_f32": 195200,
       "sram_bytes_f32": 1024,
       "flops_per_cycle": 1200,
-      "python_api_median_us": 2854.0834999876097,
-      "python_api_iqr_us": 388.8628749700729,
+      "python_api_median_us": 2579.061249998631,
+      "python_api_iqr_us": 283.77624999848194,
       "vector_kernel_median_us": null
     }
   ],
-  "histgb_nodes": 12200
+  "histgb_nodes": 12200,
+  "benchmark_environment": {
+    "os": "Windows-11-10.0.26300-SP0",
+    "machine": "AMD64",
+    "processor": "AMD64 Family 23 Model 104 Stepping 1, AuthenticAMD",
+    "python_version": "3.12.6",
+    "numpy_version": "2.2.4",
+    "runtime_precision": "float64",
+    "memory_accounting": "analytical float32 parameters and FLOP counts",
+    "timing_protocol": "time.perf_counter median and IQR across 20-25 batches (200-5000 repeats/batch)"
+  }
 }

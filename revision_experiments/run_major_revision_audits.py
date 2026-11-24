@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Post-hoc Major Revision Audits E7-E12:
+Post-hoc Major Revision Audits E7-E15:
   E7:  Label-free oblique-projector Stage-1 compatibility gate across XJTU & external chemistries
-  E8:  Causal online rebound-completion anchor selection & standardized innovation gating on XJTU B5 / B1-B6
+  E8:  Chronological online rebound-completion anchor selection & standardized innovation gating on XJTU B5 / B1-B6
   E9:  NASA Leave-One-Temperature-Regime-Out (LOTRO) vs 14-cell LOCO audit
   E10: External multi-chemistry validation on CALCE CS2 (LCO) and Tongji TJU D3 (NCM+NCA)
   E11: Asymmetric one-sided hardware voltage drift (future-only & anchor-only vs symmetric grid shift)
   E12: Stage-2 posterior predictive UQ coverage (sigma^2 vs nu=t*sigma^2) & embedded BMS compute footprint
+  E13: OOD / domain-mismatch detector baselines, B4/B6 geometric margin analysis, & fallback control audit
+  E14: UQ under distribution shift (conformal vs Bayesian, gate-conditioned coverage, & external CIs)
+  E15: SOH knee threshold sensitivity (80%, 85%, 90%) & label-free observable proxy trigger validation
 
 Strictly isolated from frozen confirmatory manifests and accepts datasets via CLI arguments
 without encoding local machine paths.
@@ -24,6 +27,7 @@ os.environ.setdefault("LOKY_MAX_CPU_COUNT", "2")
 import argparse
 import json
 import math
+import platform
 import sys
 import time
 from pathlib import Path
@@ -32,6 +36,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
+from sklearn.metrics import roc_auc_score
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
@@ -881,19 +886,918 @@ def run_e12(datasets: Dict[str, List[ref.Cell]], out_dir: Path) -> Dict[str, Any
 
     pd.DataFrame(uq_rows).to_csv(out_dir / "e12_uq_coverage.csv", index=False)
     pd.DataFrame(bms_footprint).to_csv(out_dir / "e12_bms_benchmark.csv", index=False)
-    payload = {"uq_coverage": uq_rows, "bms_footprint": bms_footprint, "histgb_nodes": int(n_hgb_nodes)}
+    env_info = {
+        "os": platform.platform(),
+        "machine": platform.machine(),
+        "processor": platform.processor(),
+        "python_version": platform.python_version(),
+        "numpy_version": np.__version__,
+        "runtime_precision": "float64",
+        "memory_accounting": "analytical float32 parameters and FLOP counts",
+        "timing_protocol": "time.perf_counter median and IQR across 20-25 batches (200-5000 repeats/batch)",
+    }
+    payload = {
+        "uq_coverage": uq_rows,
+        "bms_footprint": bms_footprint,
+        "histgb_nodes": int(n_hgb_nodes),
+        "benchmark_environment": env_info,
+    }
     _save_json(out_dir / "e12_uq_and_bms_benchmark.json", payload)
     print("[E12] Done.", flush=True)
     return payload
 
 
+# =============================================================================
+# E13: OOD Detector Baselines, B4/B6 Geometric Margin, & Fallback Control Audit
+# =============================================================================
+def _fit_fold_detectors(train_cells: List[ref.Cell], reg_floor: float = 1e-4, quantile: float = 0.99) -> Dict[str, Any]:
+    """Fit all Stage-1 unlabelled OOD/domain detectors strictly on training cells."""
+    p_prim = ref.select("primary", train_cells)["chosen"]
+    f1 = Stage1ResponseFilter(
+        lam=float(p_prim["lambda"]),
+        gamma=float(p_prim["gamma"]),
+        eta=float(p_prim["eta"]),
+    ).fit_from_cells(train_cells)
+    p_ridge = ref.select("logridge", train_cells)["chosen"]
+    m_ridge = ref.fit("logridge", p_ridge, train_cells)
+    beta_ridge = np.asarray(m_ridge["beta"], dtype=float)
+
+    X_blocks = []
+    for c in train_cells:
+        rows = ref._future_rows(c)
+        X_blocks.append(np.log(np.asarray(c.D["clean"][rows], float) / np.asarray(c.Dref["clean"], float)[None, :]))
+    X_src = np.vstack(X_blocks)
+    n_src = X_src.shape[0]
+
+    # 1. Oblique projector P_perp = I - b w^T
+    P_perp, S_perp_inv = f1.oblique_projector_matrices(reg_floor=reg_floor)
+    r_perp_src = X_src @ P_perp.T
+    d2_perp_src = np.sum((r_perp_src @ S_perp_inv) * r_perp_src, axis=1)
+    z_hat_src = X_src @ f1.w_
+    tau_d2 = float(np.percentile(d2_perp_src, 100.0 * quantile))
+    tau_zpos = float(max(np.percentile(z_hat_src, 100.0 * quantile), 0.01))
+
+    # 2. Direct 4D feature Mahalanobis (centered covariance & uncentered second moment)
+    mu_X = X_src.mean(axis=0)
+    Xc_src = X_src - mu_X[None, :]
+    cov_X = (Xc_src.T @ Xc_src) / max(1, n_src - 1) + reg_floor * np.eye(4)
+    cov_X_inv = np.linalg.inv(cov_X)
+    maha_cov_src = np.sum((Xc_src @ cov_X_inv) * Xc_src, axis=1)
+    tau_maha_cov = float(np.percentile(maha_cov_src, 100.0 * quantile))
+
+    H_src = (X_src.T @ X_src) / n_src + reg_floor * np.eye(4)
+    H_inv = np.linalg.inv(H_src)
+    maha_unc_src = np.sum((X_src @ H_inv) * X_src, axis=1)
+    tau_maha_unc = float(np.percentile(maha_unc_src, 100.0 * quantile))
+
+    # 3. Unlabelled top-1 PCA rank-3 orthogonal residual (using uncentered second moment H_src)
+    eigvals, eigvecs = np.linalg.eigh((X_src.T @ X_src) / n_src)
+    u1 = eigvecs[:, -1]
+    P_pca = np.eye(4) - np.outer(u1, u1)
+    r_pca_src = X_src @ P_pca.T
+    S_pca = (r_pca_src.T @ r_pca_src) / n_src + reg_floor * np.eye(4)
+    S_pca_inv = np.linalg.inv(S_pca)
+    d2_pca_src = np.sum((r_pca_src @ S_pca_inv) * r_pca_src, axis=1)
+    tau_pca = float(np.percentile(d2_pca_src, 100.0 * quantile))
+
+    # 4. Non-idempotent ridge residual P_ridge = I - b beta_ridge^T (Eq. in Prop. 4(b))
+    P_ridge = np.eye(4) - np.outer(f1.b_, beta_ridge)
+    r_ridge_src = X_src @ P_ridge.T
+    S_ridge = P_ridge @ f1.C_ @ P_ridge.T + reg_floor * np.eye(4)
+    S_ridge_inv = np.linalg.inv(S_ridge)
+    d2_ridge_src = np.sum((r_ridge_src @ S_ridge_inv) * r_ridge_src, axis=1)
+    tau_ridge = float(np.percentile(d2_ridge_src, 100.0 * quantile))
+
+    return {
+        "f1": f1,
+        "beta_ridge": beta_ridge,
+        "P_perp": P_perp,
+        "S_perp_inv": S_perp_inv,
+        "tau_d2": tau_d2,
+        "tau_zpos": tau_zpos,
+        "mu_X": mu_X,
+        "cov_X_inv": cov_X_inv,
+        "tau_maha_cov": tau_maha_cov,
+        "H_inv": H_inv,
+        "tau_maha_unc": tau_maha_unc,
+        "P_pca": P_pca,
+        "S_pca_inv": S_pca_inv,
+        "tau_pca": tau_pca,
+        "P_ridge": P_ridge,
+        "S_ridge_inv": S_ridge_inv,
+        "tau_ridge": tau_ridge,
+    }
+
+
+def _score_cell_detectors(det: Dict[str, Any], cell: ref.Cell) -> Dict[str, Any]:
+    rows = ref._future_rows(cell)
+    D = np.asarray(cell.D["clean"][rows], float)
+    Dr = np.asarray(cell.Dref["clean"], float)
+    X = np.log(D / Dr[None, :])
+
+    # 1 & 2: Oblique projector
+    r_perp = X @ det["P_perp"].T
+    d2_perp = np.sum((r_perp @ det["S_perp_inv"]) * r_perp, axis=1)
+    z_hat = X @ det["f1"].w_
+    pol_flip = (X[:, 0] > 0.01) & ((X[:, 2] < -0.01) | (X[:, 3] < -0.01))
+    alarm_full = (d2_perp > det["tau_d2"]) | (z_hat > det["tau_zpos"]) | pol_flip
+    score_full = np.maximum(
+        d2_perp / det["tau_d2"],
+        np.maximum(z_hat / det["tau_zpos"], pol_flip.astype(float) * 2.0),
+    )
+
+    # 3: 4D Mahalanobis (centered & uncentered)
+    Xc = X - det["mu_X"][None, :]
+    maha_cov = np.sum((Xc @ det["cov_X_inv"]) * Xc, axis=1)
+    maha_unc = np.sum((X @ det["H_inv"]) * X, axis=1)
+
+    # 4: PCA rank-3 residual
+    r_pca = X @ det["P_pca"].T
+    d2_pca = np.sum((r_pca @ det["S_pca_inv"]) * r_pca, axis=1)
+
+    # 5: Non-idempotent ridge residual
+    r_ridge = X @ det["P_ridge"].T
+    d2_ridge = np.sum((r_ridge @ det["S_ridge_inv"]) * r_ridge, axis=1)
+
+    # 6: Polarity / segment ratio rule continuous score
+    score_pol = np.where(pol_flip, 1.0 + np.maximum(X[:, 0], 0.0) + np.maximum(-np.minimum(X[:, 2], X[:, 3]), 0.0), 0.0)
+
+    return {
+        "oblique_full_gate": {"alarm": alarm_full, "score": score_full},
+        "oblique_d2_only": {"alarm": d2_perp > det["tau_d2"], "score": d2_perp / det["tau_d2"]},
+        "maha_4d_cov": {"alarm": maha_cov > det["tau_maha_cov"], "score": maha_cov / det["tau_maha_cov"]},
+        "maha_4d_uncentered": {"alarm": maha_unc > det["tau_maha_unc"], "score": maha_unc / det["tau_maha_unc"]},
+        "pca_rank3_resid": {"alarm": d2_pca > det["tau_pca"], "score": d2_pca / det["tau_pca"]},
+        "ridge_nonidemp_resid": {"alarm": d2_ridge > det["tau_ridge"], "score": d2_ridge / det["tau_ridge"]},
+        "polarity_only_rule": {"alarm": pol_flip, "score": score_pol},
+    }
+
+
+def run_e13(datasets: Dict[str, List[ref.Cell]], ext_datasets: Dict[str, List[ref.Cell]], out_dir: Path) -> Dict[str, Any]:
+    print("[E13] Running OOD detector baselines, B4 geometric analysis & fallback control audit...", flush=True)
+    b1_cells = datasets["XJTU_B1"]
+    det_frozen = _fit_fold_detectors(b1_cells, reg_floor=1e-4, quantile=0.99)
+    b1_loco_dets: List[Tuple[ref.Cell, Dict[str, Any]]] = []
+    for i, held in enumerate(b1_cells):
+        tr = [b1_cells[j] for j in range(len(b1_cells)) if j != i]
+        b1_loco_dets.append((held, _fit_fold_detectors(tr, reg_floor=1e-4, quantile=0.99)))
+
+    cohort_order = [
+        ("XJTU_B1_LOCO", "compatible_xjtu"),
+        ("XJTU_B3", "moderate_xjtu"),
+        ("XJTU_B4", "compatible_xjtu"),
+        ("XJTU_B2", "shifted_xjtu"),
+        ("XJTU_B6", "shifted_xjtu"),
+        ("NASA", "cross_chem"),
+        ("CALCE_CS2", "cross_chem"),
+        ("TJU_1C", "cross_chem"),
+        ("TJU_2C", "cross_chem"),
+        ("TJU_4C", "cross_chem"),
+    ]
+    det_names = [
+        "oblique_full_gate",
+        "oblique_d2_only",
+        "maha_4d_cov",
+        "maha_4d_uncentered",
+        "pca_rank3_resid",
+        "ridge_nonidemp_resid",
+        "polarity_only_rule",
+    ]
+
+    det_cohort_rows: List[Dict[str, Any]] = []
+    # Collect scores across cycles and cells for global AUROC
+    pool_records: Dict[str, Dict[str, List[Any]]] = {
+        d: {"cohort": [], "group": [], "cyc_score": [], "cell_alarm_frac": []} for d in det_names
+    }
+
+    for cname, grp in cohort_order:
+        if cname == "XJTU_B1_LOCO":
+            pairs = b1_loco_dets
+        elif cname in datasets:
+            pairs = [(c, det_frozen) for c in datasets[cname]]
+        elif cname in ext_datasets:
+            pairs = [(c, det_frozen) for c in ext_datasets[cname]]
+        else:
+            continue
+
+        per_det: Dict[str, List[Tuple[np.ndarray, np.ndarray]]] = {d: [] for d in det_names}
+        for c, det in pairs:
+            res = _score_cell_detectors(det, c)
+            for d in det_names:
+                al = np.asarray(res[d]["alarm"], dtype=bool)
+                sc = np.asarray(res[d]["score"], dtype=float)
+                per_det[d].append((al, sc))
+                pool_records[d]["cohort"].extend([cname] * sc.size)
+                pool_records[d]["group"].extend([grp] * sc.size)
+                pool_records[d]["cyc_score"].extend(sc.tolist())
+                pool_records[d]["cell_alarm_frac"].append((cname, grp, float(np.mean(al))))
+
+        for d in det_names:
+            cell_al_rates = [float(np.mean(al)) for al, _ in per_det[d]]
+            cell_med_scores = [float(np.median(sc)) for _, sc in per_det[d]]
+            n_rej = int(sum(r > 0.25 for r in cell_al_rates))
+            det_cohort_rows.append({
+                "cohort": cname,
+                "group": grp,
+                "detector": d,
+                "n_cells": len(pairs),
+                "mean_alarm_pct": 100.0 * float(np.mean(cell_al_rates)),
+                "cell_rejected_gt25": n_rej,
+                "med_normalized_score": float(np.mean(cell_med_scores)),
+            })
+
+    # Also test within-chemistry deep-aging transfer: TJU_1C -> TJU_2C / TJU_4C
+    tju_deep_rows: List[Dict[str, Any]] = []
+    if all(k in ext_datasets for k in ("TJU_1C", "TJU_2C", "TJU_4C")):
+        t1 = ext_datasets["TJU_1C"]
+        # Regularized 1C detector (3 cells, zero labels for OOD)
+        det_t1 = _fit_fold_detectors(t1, reg_floor=1e-4, quantile=0.99)
+        for tk in ("TJU_2C", "TJU_4C"):
+            tcs = ext_datasets[tk]
+            per_det_t = {d: [] for d in det_names}
+            for c in tcs:
+                res = _score_cell_detectors(det_t1, c)
+                for d in det_names:
+                    al = np.asarray(res[d]["alarm"], dtype=bool)
+                    sc = np.asarray(res[d]["score"], dtype=float)
+                    per_det_t[d].append((al, sc))
+            for d in det_names:
+                al_rates = [float(np.mean(al)) for al, _ in per_det_t[d]]
+                tju_deep_rows.append({
+                    "suite": f"TJU_1C_to_{tk}_deep_compatible",
+                    "detector": d,
+                    "n_cells": len(tcs),
+                    "mean_alarm_pct": 100.0 * float(np.mean(al_rates)),
+                    "cell_rejected_gt25": int(sum(r > 0.25 for r in al_rates)),
+                })
+
+    # AUROC & summary TPR/FPR table across all 7 detectors
+    detector_summary: List[Dict[str, Any]] = []
+    df_dc = pd.DataFrame(det_cohort_rows)
+    for d in det_names:
+        sub_d = df_dc[df_dc["detector"] == d].set_index("cohort")
+        cyc_groups = np.asarray(pool_records[d]["group"])
+        cyc_scores = np.asarray(pool_records[d]["cyc_score"], dtype=float)
+        mask_xjtu = np.isin(cyc_groups, ["compatible_xjtu", "shifted_xjtu"])
+        y_cyc_xjtu = (cyc_groups[mask_xjtu] == "shifted_xjtu").astype(int)
+        auroc_cyc_xjtu = float(roc_auc_score(y_cyc_xjtu, cyc_scores[mask_xjtu]))
+
+        mask_all = np.isin(cyc_groups, ["compatible_xjtu", "shifted_xjtu", "cross_chem"])
+        y_cyc_all = (cyc_groups[mask_all] != "compatible_xjtu").astype(int)
+        auroc_cyc_all = float(roc_auc_score(y_cyc_all, cyc_scores[mask_all]))
+
+        cell_rows = pool_records[d]["cell_alarm_frac"]
+        cx_y = [1 if g == "shifted_xjtu" else 0 for _, g, _ in cell_rows if g in ("compatible_xjtu", "shifted_xjtu")]
+        cx_s = [r for _, g, r in cell_rows if g in ("compatible_xjtu", "shifted_xjtu")]
+        auroc_cell_xjtu = float(roc_auc_score(cx_y, cx_s))
+
+        fpr_matched = 0.5 * (float(sub_d.loc["XJTU_B1_LOCO", "mean_alarm_pct"]) + float(sub_d.loc["XJTU_B4", "mean_alarm_pct"]))
+        rej_matched = int(sub_d.loc["XJTU_B1_LOCO", "cell_rejected_gt25"] + sub_d.loc["XJTU_B4", "cell_rejected_gt25"])
+        rej_b2 = int(sub_d.loc["XJTU_B2", "cell_rejected_gt25"])
+        rej_b6 = int(sub_d.loc["XJTU_B6", "cell_rejected_gt25"])
+        rej_cross = int(sum(sub_d.loc[k, "cell_rejected_gt25"] for k in ("NASA", "CALCE_CS2", "TJU_1C", "TJU_2C", "TJU_4C") if k in sub_d.index))
+        n_cross = int(sum(sub_d.loc[k, "n_cells"] for k in ("NASA", "CALCE_CS2", "TJU_1C", "TJU_2C", "TJU_4C") if k in sub_d.index))
+        tju2_fpr = next((r["mean_alarm_pct"] for r in tju_deep_rows if r["suite"] == "TJU_1C_to_TJU_2C_deep_compatible" and r["detector"] == d), None)
+        tju4_fpr = next((r["mean_alarm_pct"] for r in tju_deep_rows if r["suite"] == "TJU_1C_to_TJU_4C_deep_compatible" and r["detector"] == d), None)
+
+        detector_summary.append({
+            "detector": d,
+            "b1_loco_alarm_pct": float(sub_d.loc["XJTU_B1_LOCO", "mean_alarm_pct"]),
+            "b4_alarm_pct": float(sub_d.loc["XJTU_B4", "mean_alarm_pct"]),
+            "matched_xjtu_fpr_pct": fpr_matched,
+            "matched_xjtu_rej": f"{rej_matched}/16",
+            "b2_alarm_pct": float(sub_d.loc["XJTU_B2", "mean_alarm_pct"]),
+            "b2_rej": f"{rej_b2}/15",
+            "b6_alarm_pct": float(sub_d.loc["XJTU_B6", "mean_alarm_pct"]),
+            "b6_rej": f"{rej_b6}/8",
+            "cross_chem_rej": f"{rej_cross}/{n_cross}",
+            "cycle_auroc_xjtu_comp_vs_shift": auroc_cyc_xjtu,
+            "cell_auroc_xjtu_comp_vs_shift": auroc_cell_xjtu,
+            "cycle_auroc_comp_vs_all_incompat": auroc_cyc_all,
+            "tju_1c_to_2c_compat_alarm_pct": tju2_fpr,
+            "tju_1c_to_4c_compat_alarm_pct": tju4_fpr,
+        })
+
+    # 13b: Exact Geometric Explanation of XJTU B4 acceptance vs B2/B6 rejection
+    f1 = det_frozen["f1"]
+    b_S = np.asarray(f1.b_, dtype=float)
+    w = np.asarray(f1.w_, dtype=float)
+    P_perp, S_perp_inv = det_frozen["P_perp"], det_frozen["S_perp_inv"]
+    tau_d2 = det_frozen["tau_d2"]
+
+    geom_rows: List[Dict[str, Any]] = []
+    geom_cohorts = [(k, datasets[k]) for k in ("XJTU_B1", "XJTU_B3", "XJTU_B4", "XJTU_B2", "XJTU_B6", "NASA")]
+    for k in ("CALCE_CS2", "TJU_1C", "TJU_2C", "TJU_4C"):
+        if k in ext_datasets:
+            geom_cohorts.append((k, ext_datasets[k]))
+
+    for cname, cells in geom_cohorts:
+        X_list, z_list, abs_z_list, r_tilde_list = [], [], [], []
+        b_cells = []
+        for c in cells:
+            rows = ref._future_rows(c)
+            Xc = np.log(np.asarray(c.D["clean"][rows], float) / np.asarray(c.Dref["clean"], float)[None, :])
+            zc = np.log(np.asarray(c.y[rows], float) / float(c.ref_y))
+            b_cells.append((Xc * zc[:, None]).mean(axis=0) / float(np.mean(zc ** 2)))
+            X_list.append(Xc)
+            z_list.append(zc)
+            abs_z_list.extend(np.abs(zc).tolist())
+        b_K = np.mean(np.vstack(b_cells), axis=0)
+        X_all = np.vstack(X_list)
+        z_all = np.concatenate(z_list)
+        r_tilde = X_all - z_all[:, None] * b_K[None, :]
+        r_tilde_perp = r_tilde @ P_perp.T
+        noise_d2 = np.sum((r_tilde_perp @ S_perp_inv) * r_tilde_perp, axis=1)
+
+        gamma_eff = float(b_K @ w)
+        delta_perp = P_perp @ b_K
+        eta_perp = math.sqrt(max(float(delta_perp @ S_perp_inv @ delta_perp), 0.0))
+        med_abs_z = float(np.median(abs_z_list))
+        p95_abs_z = float(np.percentile(abs_z_list, 95))
+        det_d2_med = float((eta_perp * med_abs_z) ** 2)
+        det_d2_p95 = float((eta_perp * p95_abs_z) ** 2)
+        z_crit = math.sqrt(tau_d2) / eta_perp if eta_perp > 1e-9 else float("inf")
+        soh_rel_crit = math.exp(-z_crit) if math.isfinite(z_crit) and z_crit < 50.0 else 0.0
+        geom_rows.append({
+            "cohort": cname,
+            "slope_euclid_diff": float(np.linalg.norm(b_K - b_S)),
+            "gamma_eff": gamma_eff,
+            "delta_perp_norm": float(np.linalg.norm(delta_perp)),
+            "eta_perp": eta_perp,
+            "med_abs_z": med_abs_z,
+            "p95_abs_z": p95_abs_z,
+            "det_d2_at_med_z": det_d2_med,
+            "det_d2_at_p95_z": det_d2_p95,
+            "med_noise_d2": float(np.median(noise_d2)),
+            "z_crit_tau_d2": z_crit,
+            "rel_soh_crit_tau_d2": soh_rel_crit,
+        })
+
+    # 13c: Fallback Control Policy Comparison on Warning Alarms
+    m_hgb_b1 = ref.fit("histgb", ref.select("histgb", b1_cells)["chosen"], b1_cells)
+    m_logr_b1 = ref.fit("logridge", ref.select("logridge", b1_cells)["chosen"], b1_cells)
+
+    loco_fb_models: List[Tuple[ref.Cell, Dict[str, Any], Dict[str, Any], Dict[str, Any]]] = []
+    for i, held in enumerate(b1_cells):
+        tr = [b1_cells[j] for j in range(len(b1_cells)) if j != i]
+        loco_fb_models.append((
+            held,
+            b1_loco_dets[i][1],
+            ref.fit("logridge", ref.select("logridge", tr)["chosen"], tr),
+            ref.fit("histgb", ref.select("histgb", tr)["chosen"], tr),
+        ))
+
+    fb_rows: List[Dict[str, Any]] = []
+    fb_cohorts = ["XJTU_B1_LOCO", "XJTU_B3", "XJTU_B4", "XJTU_B2", "XJTU_B6", "NASA"]
+    for k in ("CALCE_CS2", "TJU_2C", "TJU_4C"):
+        if k in ext_datasets:
+            fb_cohorts.append(k)
+
+    for cname in fb_cohorts:
+        if cname == "XJTU_B1_LOCO":
+            quads = loco_fb_models
+        elif cname in datasets:
+            quads = [(c, det_frozen, m_logr_b1, m_hgb_b1) for c in datasets[cname]]
+        else:
+            quads = [(c, det_frozen, m_logr_b1, m_hgb_b1) for c in ext_datasets[cname]]
+
+        pol_maes: Dict[str, List[float]] = {
+            "raw_primary": [],
+            "hold_last_safe": [],
+            "alarm_to_yref": [],
+            "latch_yref_on_3consec": [],
+            "alarm_to_damped_logridge": [],
+            "alarm_to_histgb": [],
+            "always_anchor_constant": [],
+        }
+        for c, det, m_lr, m_hg in quads:
+            rows = ref._future_rows(c)
+            yt = np.asarray(c.y[rows], dtype=float)
+            D = np.asarray(c.D["clean"][rows], float)
+            Dr = np.asarray(c.Dref["clean"], float)
+            yr = float(c.ref_y)
+            g_res = det["f1"].predict_gated(
+                D, Dr, yr, tau_d2=det["tau_d2"], tau_zpos=det["tau_zpos"], reg_floor=1e-4
+            )
+            al = np.asarray(g_res["alarm"], dtype=bool)
+            y_raw = np.asarray(g_res["y_hat_raw"], dtype=float)
+            y_hold = np.asarray(g_res["y_hat_gated"], dtype=float)
+            y_const = np.full_like(y_raw, yr)
+            y_al_const = np.where(al, yr, y_raw)
+
+            # Latch commissioning y_ref permanently once 3 consecutive alarms occur (RPT requested)
+            y_latch = y_raw.copy()
+            consec = 0
+            latched = False
+            for idx in range(y_raw.size):
+                if latched:
+                    y_latch[idx] = yr
+                elif bool(al[idx]):
+                    consec += 1
+                    y_latch[idx] = yr
+                    if consec >= 3:
+                        latched = True
+                else:
+                    consec = 0
+
+            y_lr = ref.predict(m_lr, c, "clean")
+            y_lr_damp = yr * ((y_lr / yr) ** 0.5)
+            y_al_damp = np.where(al, y_lr_damp, y_raw)
+            y_hg = ref.predict(m_hg, c, "clean")
+            y_al_hg = np.where(al, y_hg, y_raw)
+
+            pol_maes["raw_primary"].append(100.0 * float(np.mean(np.abs(y_raw - yt))))
+            pol_maes["hold_last_safe"].append(100.0 * float(np.mean(np.abs(y_hold - yt))))
+            pol_maes["alarm_to_yref"].append(100.0 * float(np.mean(np.abs(y_al_const - yt))))
+            pol_maes["latch_yref_on_3consec"].append(100.0 * float(np.mean(np.abs(y_latch - yt))))
+            pol_maes["alarm_to_damped_logridge"].append(100.0 * float(np.mean(np.abs(y_al_damp - yt))))
+            pol_maes["alarm_to_histgb"].append(100.0 * float(np.mean(np.abs(y_al_hg - yt))))
+            pol_maes["always_anchor_constant"].append(100.0 * float(np.mean(np.abs(y_const - yt))))
+
+        row_fb = {"cohort": cname, "n_cells": len(quads)}
+        for pkey, vals in pol_maes.items():
+            row_fb[f"{pkey}_mae_pp"] = float(np.mean(vals))
+        fb_rows.append(row_fb)
+
+    # Pooled B4/B6 fallback mean
+    fb_by_c = {r["cohort"]: r for r in fb_rows}
+    if "XJTU_B4" in fb_by_c and "XJTU_B6" in fb_by_c:
+        mean_row = {"cohort": "B4_B6_mean", "n_cells": 16}
+        for k in fb_by_c["XJTU_B4"]:
+            if k.endswith("_mae_pp"):
+                mean_row[k] = 0.5 * (fb_by_c["XJTU_B4"][k] + fb_by_c["XJTU_B6"][k])
+        fb_rows.append(mean_row)
+
+    pd.DataFrame(detector_summary).to_csv(out_dir / "e13_ood_detector_comparison.csv", index=False)
+    pd.DataFrame(fb_rows).to_csv(out_dir / "e13_fallback_policies.csv", index=False)
+    payload = {
+        "detector_summary": detector_summary,
+        "detector_by_cohort": det_cohort_rows,
+        "tju_deep_compatible_alarm": tju_deep_rows,
+        "geometric_margin_analysis": geom_rows,
+        "fallback_policies": fb_rows,
+    }
+    _save_json(out_dir / "e13_ood_baselines_and_fallback.json", payload)
+    print("[E13] Done.", flush=True)
+    return payload
+
+
+# =============================================================================
+# E14: UQ Under Shift (Conformal vs Bayesian, Gate-Conditioned) & External CIs
+# =============================================================================
+def _bootstrap_cell_ci(vals: Sequence[float], n_boot: int = 20000, seed: int = 20261107) -> Dict[str, Any]:
+    arr = np.asarray(vals, dtype=float)
+    m = arr.size
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, m, size=(n_boot, m))
+    boot_means = arr[idx].mean(axis=1)
+    return {
+        "mean": float(arr.mean()),
+        "sd": float(arr.std(ddof=1)) if m > 1 else 0.0,
+        "min": float(arr.min()),
+        "max": float(arr.max()),
+        "ci95_lo": float(np.percentile(boot_means, 2.5)),
+        "ci95_hi": float(np.percentile(boot_means, 97.5)),
+        "cell_vals": [float(v) for v in arr],
+    }
+
+
+def _conformal_loo_quantiles(train_cells: List[ref.Cell], lam: float, t_val: float, alpha: float = 0.05) -> Tuple[float, float]:
+    """Leave-one-cell-out conformal quantiles (unweighted |e| and studentized |e|/sd) for Stage 2."""
+    abs_res, norm_res = [], []
+    for i, held in enumerate(train_cells):
+        tr = [train_cells[j] for j in range(len(train_cells)) if j != i]
+        upd = Stage2RankOneUpdater(lam=lam, t=t_val).fit_from_cells(tr)
+        D_fut = np.asarray(held.D["clean"], float)
+        Dr = np.asarray(held.Dref["clean"], float)
+        y_all = np.asarray(held.y, float)
+        fut_pos = np.arange(4, y_all.size, dtype=int)
+        if fut_pos.size == 0:
+            continue
+        iv = upd.predict_interval(
+            D_fut[fut_pos], Dr, D_cal=D_fut[3], y_cal=float(y_all[3]), y_ref=float(held.ref_y),
+            level=1.0 - alpha, include_t_scale=True,
+        )
+        z_true = np.log(y_all[fut_pos] / float(held.ref_y))
+        z_pred = np.log(np.asarray(iv["pred"], float))
+        log_sd = np.asarray(iv["log_sd"], float)
+        e = np.abs(z_true - z_pred)
+        abs_res.extend(e.tolist())
+        norm_res.extend((e / log_sd).tolist())
+
+    def _fq(arr_list: List[float]) -> float:
+        s = np.sort(np.asarray(arr_list, dtype=float))
+        n = s.size
+        k = min(n, max(1, int(math.ceil((n + 1) * (1.0 - alpha)))))
+        return float(s[k - 1])
+
+    return _fq(norm_res), _fq(abs_res)
+
+
+def run_e14(datasets: Dict[str, List[ref.Cell]], ext_datasets: Dict[str, List[ref.Cell]], out_dir: Path) -> Dict[str, Any]:
+    print("[E14] Running Stage-2 conformal/gated UQ reliability & external bootstrap CIs...", flush=True)
+    b1_cells = datasets["XJTU_B1"]
+    f1_frozen = Stage1ResponseFilter.from_pretrained("XJTU_B1")
+    u2_frozen = Stage2RankOneUpdater.from_pretrained()
+
+    # Build unbiased 8-fold LOCO tuples on XJTU_B1 (matching E12 hyperparameter CV)
+    b1_loco_models: List[Tuple[ref.Cell, Stage1ResponseFilter, Stage2RankOneUpdater, float, float]] = []
+    for i, held in enumerate(b1_cells):
+        tr = [b1_cells[j] for j in range(len(b1_cells)) if j != i]
+        p_s1 = ref.select("primary", tr)["chosen"]
+        f1_f = Stage1ResponseFilter(lam=float(p_s1["lambda"]), gamma=float(p_s1["gamma"]), eta=float(p_s1["eta"])).fit_from_cells(tr)
+        best_sc, best_lt = float("inf"), (1e-4, 10.0)
+        for lam in s2.LAMBDAS:
+            for tv in s2.TG:
+                ms = []
+                for j in range(len(tr)):
+                    sub_tr = [tr[k] for k in range(len(tr)) if k != j]
+                    st_f = s2.fit_stats(sub_tr, lam)
+                    out = s2.predict("primary", st_f, {"lambda": lam, "t": tv}, tr[j], "clean", stride=1)
+                    fp = np.asarray(out["future_positions"], int)
+                    yt = np.asarray(tr[j].y[fp], float) / float(tr[j].ref_y)
+                    ms.append(float(np.mean(np.abs(out["pred"] - yt))))
+                if np.mean(ms) < best_sc:
+                    best_sc = float(np.mean(ms))
+                    best_lt = (lam, tv)
+        u2_f = Stage2RankOneUpdater(lam=best_lt[0], t=best_lt[1]).fit_from_cells(tr)
+        qn, qa = _conformal_loo_quantiles(tr, best_lt[0], best_lt[1], alpha=0.05)
+        b1_loco_models.append((held, f1_f, u2_f, qn, qa))
+
+    qn_b1, qa_b1 = _conformal_loo_quantiles(b1_cells, float(u2_frozen.lam), float(u2_frozen.t), alpha=0.05)
+
+    def _eval_uq_suite(label: str, items: List[Tuple[ref.Cell, Stage1ResponseFilter, Stage2RankOneUpdater, float, float]]) -> Dict[str, Any]:
+        c_nu, w_nu = [], []
+        c_conf_s, w_conf_s = [], []
+        c_conf_a, w_conf_a = [], []
+        c_gated_nu, c_gated_cs, accept_fracs = [], [], []
+        c_hi_nu, c_lo_nu, c_hi_cs, c_lo_cs = [], [], [], []
+        n_cells_accepted = 0
+
+        for held, f1_m, u2_m, qn, qa in items:
+            D_fut = np.asarray(held.D["clean"], float)
+            Dr = np.asarray(held.Dref["clean"], float)
+            y_all = np.asarray(held.y, float)
+            fut_pos = np.arange(4, y_all.size, dtype=int)
+            hf = y_all[fut_pos] / float(held.ref_y)
+            D_eval = D_fut[fut_pos]
+
+            iv = u2_m.predict_interval(
+                D_eval, Dr, D_cal=D_fut[3], y_cal=float(y_all[3]), y_ref=float(held.ref_y),
+                level=0.95, include_t_scale=True,
+            )
+            pred = np.asarray(iv["pred"], float)
+            mu = np.log(pred)
+            sd = np.asarray(iv["log_sd"], float)
+            zeta_a = float(iv["standardized_innovation_zeta"])
+
+            in_nu = (hf >= iv["lower"]) & (hf <= iv["upper"])
+            lo_cs, hi_cs = np.exp(mu - qn * sd), np.exp(mu + qn * sd)
+            in_cs = (hf >= lo_cs) & (hf <= hi_cs)
+            lo_ca, hi_ca = np.exp(mu - qa), np.exp(mu + qa)
+            in_ca = (hf >= lo_ca) & (hf <= hi_ca)
+
+            c_nu.append(float(np.mean(in_nu)))
+            w_nu.append(100.0 * float(np.mean(iv["upper"] - iv["lower"])))
+            c_conf_s.append(float(np.mean(in_cs)))
+            w_conf_s.append(100.0 * float(np.mean(hi_cs - lo_cs)))
+            c_conf_a.append(float(np.mean(in_ca)))
+            w_conf_a.append(100.0 * float(np.mean(hi_ca - lo_ca)))
+
+            if np.any(hf > 0.85):
+                c_hi_nu.append(float(np.mean(in_nu[hf > 0.85])))
+                c_hi_cs.append(float(np.mean(in_cs[hf > 0.85])))
+            if np.any(hf <= 0.85):
+                c_lo_nu.append(float(np.mean(in_nu[hf <= 0.85])))
+                c_lo_cs.append(float(np.mean(in_cs[hf <= 0.85])))
+
+            # Gate-conditioned UQ: accept intervals only when Stage-1 projector gate is calm AND zeta_a <= 2.0
+            g_res = f1_m.predict_gated(D_eval, Dr, float(held.ref_y))
+            cycle_accept = (~np.asarray(g_res["alarm"], bool)) & (zeta_a <= 2.0)
+            accept_fracs.append(float(np.mean(cycle_accept)))
+            if (not bool(g_res["domain_incompatible"])) and (zeta_a <= 2.0) and np.any(cycle_accept):
+                n_cells_accepted += 1
+                c_gated_nu.append(float(np.mean(in_nu[cycle_accept])))
+                c_gated_cs.append(float(np.mean(in_cs[cycle_accept])))
+
+        return {
+            "cohort": label,
+            "n_cells": len(items),
+            "q95_studentized_conformal": float(np.mean([x[3] for x in items])),
+            "cov95_nu_pct": 100.0 * float(np.mean(c_nu)),
+            "width95_nu_pp": float(np.mean(w_nu)),
+            "cov95_conformal_stud_pct": 100.0 * float(np.mean(c_conf_s)),
+            "width95_conformal_stud_pp": float(np.mean(w_conf_s)),
+            "cov95_conformal_abs_pct": 100.0 * float(np.mean(c_conf_a)),
+            "width95_conformal_abs_pp": float(np.mean(w_conf_a)),
+            "accepted_cells": n_cells_accepted,
+            "accepted_cycles_pct": 100.0 * float(np.mean(accept_fracs)),
+            "gated_cov95_nu_pct": 100.0 * float(np.mean(c_gated_nu)) if c_gated_nu else None,
+            "gated_cov95_conformal_stud_pct": 100.0 * float(np.mean(c_gated_cs)) if c_gated_cs else None,
+            "hi_h_gt085_cov95_nu_pct": 100.0 * float(np.mean(c_hi_nu)) if c_hi_nu else None,
+            "lo_h_le085_cov95_nu_pct": 100.0 * float(np.mean(c_lo_nu)) if c_lo_nu else None,
+            "hi_h_gt085_cov95_cs_pct": 100.0 * float(np.mean(c_hi_cs)) if c_hi_cs else None,
+            "lo_h_le085_cov95_cs_pct": 100.0 * float(np.mean(c_lo_cs)) if c_lo_cs else None,
+        }
+
+    uq_shift_rows: List[Dict[str, Any]] = [_eval_uq_suite("XJTU_B1_LOCO", b1_loco_models)]
+    for cname in ("XJTU_B3", "XJTU_B4", "XJTU_B5", "XJTU_B2", "XJTU_B6"):
+        uq_shift_rows.append(
+            _eval_uq_suite(cname, [(c, f1_frozen, u2_frozen, qn_b1, qa_b1) for c in datasets[cname]])
+        )
+
+    # Protocol-matched within-chemistry Tongji TJU_1C -> TJU_2C / TJU_4C UQ
+    if all(k in ext_datasets for k in ("TJU_1C", "TJU_2C", "TJU_4C")):
+        t1 = ext_datasets["TJU_1C"]
+        p_t1 = ref.select("primary", t1)["chosen"]
+        f1_t1 = Stage1ResponseFilter(lam=float(p_t1["lambda"]), gamma=float(p_t1["gamma"]), eta=float(p_t1["eta"])).fit_from_cells(t1)
+        u2_t1 = Stage2RankOneUpdater(lam=1e-6, t=0.1).fit_from_cells(t1)
+        qn_t1, qa_t1 = _conformal_loo_quantiles(t1, 1e-6, 0.1, alpha=0.05)
+        for tk in ("TJU_2C", "TJU_4C"):
+            uq_shift_rows.append(
+                _eval_uq_suite(f"TJU_1C_to_{tk}", [(c, f1_t1, u2_t1, qn_t1, qa_t1) for c in ext_datasets[tk]])
+            )
+
+    # 14b: External Cohort Cell-Level Bootstrap CIs & Min-Max Ranges
+    ext_ci_rows: List[Dict[str, Any]] = []
+    ext_kinds = ["primary", "logridge", "histgb", "best_segment", "endpoint", "anchor_constant"]
+    if "CALCE_CS2" in ext_datasets:
+        cs2 = ext_datasets["CALCE_CS2"]
+        per_m: Dict[str, List[float]] = {m: [] for m in ext_kinds}
+        for i, held in enumerate(cs2):
+            tr = [cs2[j] for j in range(len(cs2)) if j != i]
+            rows = ref._future_rows(held)
+            yt = np.asarray(held.y[rows], float)
+            for m in ext_kinds:
+                mod = ref.fit(m, ref.select(m, tr)["chosen"], tr)
+                yh = ref.predict(mod, held, "clean")
+                per_m[m].append(100.0 * float(np.mean(np.abs(yh - yt))))
+        for m in ext_kinds:
+            st = _bootstrap_cell_ci(per_m[m])
+            st.update({"evaluation": "CALCE_CS2_LOCO", "model": m, "n_cells": len(cs2)})
+            ext_ci_rows.append(st)
+        for ctrl in ("endpoint", "anchor_constant"):
+            diff = np.asarray(per_m["primary"]) - np.asarray(per_m[ctrl])
+            st = _bootstrap_cell_ci(diff)
+            st.update({"evaluation": "CALCE_CS2_LOCO", "model": f"primary_minus_{ctrl}", "n_cells": len(cs2)})
+            ext_ci_rows.append(st)
+
+    if "TJU_1C" in ext_datasets:
+        t1 = ext_datasets["TJU_1C"]
+        fitted_t1 = {m: ref.fit(m, ref.select(m, t1)["chosen"], t1) for m in ext_kinds}
+        for tk in ("TJU_2C", "TJU_4C"):
+            if tk not in ext_datasets:
+                continue
+            tcs = ext_datasets[tk]
+            per_m = {m: [] for m in ext_kinds}
+            for held in tcs:
+                rows = ref._future_rows(held)
+                yt = np.asarray(held.y[rows], float)
+                for m in ext_kinds:
+                    yh = ref.predict(fitted_t1[m], held, "clean")
+                    per_m[m].append(100.0 * float(np.mean(np.abs(yh - yt))))
+            for m in ext_kinds:
+                st = _bootstrap_cell_ci(per_m[m])
+                st.update({"evaluation": f"TJU_1C_to_{tk}", "model": m, "n_cells": len(tcs)})
+                ext_ci_rows.append(st)
+            for ctrl in ("endpoint", "anchor_constant"):
+                diff = np.asarray(per_m["primary"]) - np.asarray(per_m[ctrl])
+                st = _bootstrap_cell_ci(diff)
+                st.update({"evaluation": f"TJU_1C_to_{tk}", "model": f"primary_minus_{ctrl}", "n_cells": len(tcs)})
+                ext_ci_rows.append(st)
+
+    pd.DataFrame(uq_shift_rows).to_csv(out_dir / "e14_uq_conformal_gated.csv", index=False)
+    pd.DataFrame([{k: v for k, v in r.items() if k != "cell_vals"} for r in ext_ci_rows]).to_csv(
+        out_dir / "e14_external_bootstrap_cis.csv", index=False
+    )
+    payload = {"uq_conformal_and_gated": uq_shift_rows, "external_bootstrap_cis": ext_ci_rows}
+    _save_json(out_dir / "e14_uq_conformal_and_external_ci.json", payload)
+    print("[E14] Done.", flush=True)
+    return payload
+
+
+# =============================================================================
+# E15: SOH Knee Threshold Sensitivity (80%, 85%, 90%) & Observable Proxy Check
+# =============================================================================
+def run_e15(datasets: Dict[str, List[ref.Cell]], ext_datasets: Dict[str, List[ref.Cell]], out_dir: Path) -> Dict[str, Any]:
+    print("[E15] Running 80%/85%/90% SOH knee threshold sensitivity & observable proxy triggers...", flush=True)
+    b1_cells = datasets["XJTU_B1"]
+    f1_frozen = Stage1ResponseFilter.from_pretrained("XJTU_B1")
+    u2_frozen = Stage2RankOneUpdater.from_pretrained()
+    m_b1_mods = {
+        m: ref.fit(m, ref.select(m, b1_cells)["chosen"], b1_cells)
+        for m in ("primary", "logridge", "endpoint", "anchor_constant")
+    }
+
+    # Prepare held-out LOCO fold models for XJTU_B1, NASA, and CALCE_CS2, and 1C fit for TJU
+    b1_loco_s1, b1_loco_s2, b1_loco_f1 = [], [], []
+    for i, held in enumerate(b1_cells):
+        tr = [b1_cells[j] for j in range(len(b1_cells)) if j != i]
+        p1 = ref.select("primary", tr)["chosen"]
+        f1_f = Stage1ResponseFilter(lam=float(p1["lambda"]), gamma=float(p1["gamma"]), eta=float(p1["eta"])).fit_from_cells(tr)
+        b1_loco_f1.append((held, f1_f))
+        b1_loco_s1.append((held, {m: ref.fit(m, ref.select(m, tr)["chosen"], tr) for m in ("primary", "logridge", "endpoint", "anchor_constant")}))
+        st_f = s2.fit_stats(tr, 1e-4)
+        b1_loco_s2.append((held, st_f))
+
+    nasa_cells = datasets["NASA"]
+    nasa_loco_s1 = []
+    for i, held in enumerate(nasa_cells):
+        tr = [nasa_cells[j] for j in range(len(nasa_cells)) if j != i]
+        nasa_loco_s1.append((held, {m: ref.fit(m, ref.select(m, tr)["chosen"], tr) for m in ("primary", "logridge", "endpoint", "anchor_constant")}))
+
+    calce_loco_s1 = []
+    if "CALCE_CS2" in ext_datasets:
+        cs2 = ext_datasets["CALCE_CS2"]
+        for i, held in enumerate(cs2):
+            tr = [cs2[j] for j in range(len(cs2)) if j != i]
+            calce_loco_s1.append((held, {m: ref.fit(m, ref.select(m, tr)["chosen"], tr) for m in ("primary", "logridge", "endpoint", "anchor_constant")}))
+
+    thresholds = [0.90, 0.85, 0.80]
+    strata_rows: List[Dict[str, Any]] = []
+
+    def _collect_s1_strata(cname: str, pairs: List[Tuple[ref.Cell, Dict[str, Any]]]) -> None:
+        for thr in thresholds:
+            hi_e: Dict[str, List[float]] = {m: [] for m in ("primary", "logridge", "endpoint", "anchor_constant")}
+            lo_e: Dict[str, List[float]] = {m: [] for m in ("primary", "logridge", "endpoint", "anchor_constant")}
+            n_hi_cells, n_lo_cells = set(), set()
+            n_hi_pts, n_lo_pts = 0, 0
+            for held, mods in pairs:
+                rows = ref._rows_for_predict(held)
+                yt = np.asarray(held.y[rows], float)
+                m_hi = yt > thr
+                m_lo = yt <= thr
+                n_hi_pts += int(np.sum(m_hi))
+                n_lo_pts += int(np.sum(m_lo))
+                if np.any(m_hi):
+                    n_hi_cells.add(held.name)
+                if np.any(m_lo):
+                    n_lo_cells.add(held.name)
+                for mname, mod in mods.items():
+                    yh = ref.predict(mod, held, "clean")
+                    err = np.abs(yh - yt) * 100.0
+                    if np.any(m_hi):
+                        hi_e[mname].append(float(np.mean(err[m_hi])))
+                    if np.any(m_lo):
+                        lo_e[mname].append(float(np.mean(err[m_lo])))
+            strata_rows.append({
+                "stage": "Stage1",
+                "cohort": cname,
+                "threshold_soh": thr,
+                "hi_cells": len(n_hi_cells),
+                "hi_profiles": n_hi_pts,
+                "lo_cells": len(n_lo_cells),
+                "lo_profiles": n_lo_pts,
+                "hi_primary_pp": float(np.mean(hi_e["primary"])) if hi_e["primary"] else None,
+                "lo_primary_pp": float(np.mean(lo_e["primary"])) if lo_e["primary"] else None,
+                "hi_logridge_pp": float(np.mean(hi_e["logridge"])) if hi_e["logridge"] else None,
+                "lo_logridge_pp": float(np.mean(lo_e["logridge"])) if lo_e["logridge"] else None,
+                "hi_endpoint_pp": float(np.mean(hi_e["endpoint"])) if hi_e["endpoint"] else None,
+                "lo_endpoint_pp": float(np.mean(lo_e["endpoint"])) if lo_e["endpoint"] else None,
+                "hi_anchor_const_pp": float(np.mean(hi_e["anchor_constant"])) if hi_e["anchor_constant"] else None,
+                "lo_anchor_const_pp": float(np.mean(lo_e["anchor_constant"])) if lo_e["anchor_constant"] else None,
+            })
+
+    _collect_s1_strata("XJTU_B1_LOCO", b1_loco_s1)
+    _collect_s1_strata("XJTU_B3", [(c, m_b1_mods) for c in datasets["XJTU_B3"]])
+    _collect_s1_strata("XJTU_B4", [(c, m_b1_mods) for c in datasets["XJTU_B4"]])
+    _collect_s1_strata("XJTU_B2", [(c, m_b1_mods) for c in datasets["XJTU_B2"]])
+    _collect_s1_strata("XJTU_B6", [(c, m_b1_mods) for c in datasets["XJTU_B6"]])
+    _collect_s1_strata("NASA_LOCO", nasa_loco_s1)
+    if calce_loco_s1:
+        _collect_s1_strata("CALCE_CS2_LOCO", calce_loco_s1)
+    if all(k in ext_datasets for k in ("TJU_1C", "TJU_2C", "TJU_4C")):
+        t1 = ext_datasets["TJU_1C"]
+        m_t1 = {m: ref.fit(m, ref.select(m, t1)["chosen"], t1) for m in ("primary", "logridge", "endpoint", "anchor_constant")}
+        _collect_s1_strata("TJU_1C_to_2C", [(c, m_t1) for c in ext_datasets["TJU_2C"]])
+        _collect_s1_strata("TJU_1C_to_4C", [(c, m_t1) for c in ext_datasets["TJU_4C"]])
+
+    # Stage 2 knee sensitivity at relative health h_t = y/y_ref thresholds
+    st_b1_frozen = s2.fit_stats(b1_cells, 1e-4)
+    for cname, s2_pairs in [
+        ("XJTU_B1_LOCO", b1_loco_s2),
+        ("XJTU_B3", [(c, st_b1_frozen) for c in datasets["XJTU_B3"]]),
+        ("XJTU_B4", [(c, st_b1_frozen) for c in datasets["XJTU_B4"]]),
+        ("XJTU_B5", [(c, st_b1_frozen) for c in datasets["XJTU_B5"]]),
+        ("XJTU_B6", [(c, st_b1_frozen) for c in datasets["XJTU_B6"]]),
+    ]:
+        for thr in thresholds:
+            hi_p, lo_p, hi_s, lo_s = [], [], [], []
+            n_lo_c, n_lo_n, n_hi_n = 0, 0, 0
+            for held, st in s2_pairs:
+                o_p = s2.predict("primary", st, {"lambda": 1e-4, "t": 10.0}, held, "clean", stride=1)
+                o_s = s2.predict("target_secant", st, {"lambda": 1e-4, "t": 10.0}, held, "clean", stride=1)
+                fp = np.asarray(o_p["future_positions"], int)
+                ht = np.asarray(held.y[fp], float) / float(held.ref_y)
+                m_hi, m_lo = ht > thr, ht <= thr
+                n_hi_n += int(np.sum(m_hi))
+                n_lo_n += int(np.sum(m_lo))
+                if np.any(m_hi):
+                    hi_p.append(100.0 * float(np.mean(np.abs(o_p["pred"] - ht)[m_hi])))
+                    hi_s.append(100.0 * float(np.mean(np.abs(o_s["pred"] - ht)[m_hi])))
+                if np.any(m_lo):
+                    n_lo_c += 1
+                    lo_p.append(100.0 * float(np.mean(np.abs(o_p["pred"] - ht)[m_lo])))
+                    lo_s.append(100.0 * float(np.mean(np.abs(o_s["pred"] - ht)[m_lo])))
+            strata_rows.append({
+                "stage": "Stage2",
+                "cohort": cname,
+                "threshold_soh": thr,
+                "hi_cells": len(s2_pairs),
+                "hi_profiles": n_hi_n,
+                "lo_cells": n_lo_c,
+                "lo_profiles": n_lo_n,
+                "hi_primary_pp": float(np.mean(hi_p)) if hi_p else None,
+                "lo_primary_pp": float(np.mean(lo_p)) if lo_p else None,
+                "hi_logridge_pp": float(np.mean(hi_s)) if hi_s else None,
+                "lo_logridge_pp": float(np.mean(lo_s)) if lo_s else None,
+                "hi_endpoint_pp": None,
+                "lo_endpoint_pp": None,
+                "hi_anchor_const_pp": None,
+                "lo_anchor_const_pp": None,
+            })
+
+    # 15b: Label-free observable knee trigger test (without ground-truth y_t!)
+    proxy_rows: List[Dict[str, Any]] = []
+    proxy_cohorts = [
+        ("XJTU_B1_LOCO", b1_loco_f1),
+        ("XJTU_B4", [(c, f1_frozen) for c in datasets["XJTU_B4"]]),
+        ("XJTU_B6", [(c, f1_frozen) for c in datasets["XJTU_B6"]]),
+    ]
+    if "CALCE_CS2" in ext_datasets:
+        cs2 = ext_datasets["CALCE_CS2"]
+        c_pairs = []
+        for i, held in enumerate(cs2):
+            tr = [cs2[j] for j in range(len(cs2)) if j != i]
+            p1 = ref.select("primary", tr)["chosen"]
+            f1_c = Stage1ResponseFilter(lam=float(p1["lambda"]), gamma=float(p1["gamma"]), eta=float(p1["eta"])).fit_from_cells(tr)
+            c_pairs.append((held, f1_c))
+        proxy_cohorts.append(("CALCE_CS2_LOCO", c_pairs))
+    if all(k in ext_datasets for k in ("TJU_1C", "TJU_2C", "TJU_4C")):
+        t1 = ext_datasets["TJU_1C"]
+        p1 = ref.select("primary", t1)["chosen"]
+        f1_t = Stage1ResponseFilter(lam=float(p1["lambda"]), gamma=float(p1["gamma"]), eta=float(p1["eta"])).fit_from_cells(t1)
+        proxy_cohorts.append(("TJU_1C_to_2C", [(c, f1_t) for c in ext_datasets["TJU_2C"]]))
+        proxy_cohorts.append(("TJU_1C_to_4C", [(c, f1_t) for c in ext_datasets["TJU_4C"]]))
+
+    for cname, pairs in proxy_cohorts:
+        for tau_hat in thresholds:
+            pre_maes, trig_soh = [], []
+            n_reach_80, n_caught_before_80 = 0, 0
+            for held, f1_m in pairs:
+                rows = ref._future_rows(held)
+                yt = np.asarray(held.y[rows], float)
+                D = np.asarray(held.D["clean"][rows], float)
+                Dr = np.asarray(held.Dref["clean"], float)
+                yr = float(held.ref_y)
+                g_res = f1_m.predict_gated(D, Dr, yr)
+                y_raw = np.asarray(g_res["y_hat_raw"], float)
+                al = np.asarray(g_res["alarm"], bool)
+                # Label-free endpoint partial-charge proxy y_endpt = y_ref * sum(D) / sum(D_ref)
+                y_end = yr * (np.sum(D, axis=1) / float(np.sum(Dr)))
+                # Recalibration trigger at first cycle where (y_hat_raw <= tau_hat) OR (y_end <= tau_hat) OR 3 consec alarms
+                consec = 0
+                trig_idx = None
+                for idx in range(y_raw.size):
+                    consec = (consec + 1) if bool(al[idx]) else 0
+                    if (y_raw[idx] <= tau_hat) or (y_end[idx] <= tau_hat) or (consec >= 3):
+                        trig_idx = idx
+                        break
+                has_lt80 = bool(np.any(yt < 0.80))
+                if has_lt80:
+                    n_reach_80 += 1
+                    first_lt80 = int(np.argmax(yt < 0.80))
+                    if trig_idx is not None and trig_idx <= first_lt80:
+                        n_caught_before_80 += 1
+                if trig_idx is not None:
+                    trig_soh.append(float(yt[trig_idx]))
+                end_slice = trig_idx if (trig_idx is not None and trig_idx > 0) else y_raw.size
+                pre_maes.append(100.0 * float(np.mean(np.abs(y_raw[:end_slice] - yt[:end_slice]))))
+            proxy_rows.append({
+                "cohort": cname,
+                "observable_tau_hat": tau_hat,
+                "n_cells": len(pairs),
+                "n_cells_reaching_lt080": n_reach_80,
+                "n_triggered_before_080": n_caught_before_80,
+                "med_true_soh_at_trigger": float(np.median(trig_soh)) if trig_soh else None,
+                "pre_trigger_mae_pp": float(np.mean(pre_maes)),
+            })
+
+    pd.DataFrame(strata_rows).to_csv(out_dir / "e15_soh_knee_sensitivity.csv", index=False)
+    pd.DataFrame(proxy_rows).to_csv(out_dir / "e15_observable_proxy_triggers.csv", index=False)
+    payload = {"soh_knee_sensitivity": strata_rows, "observable_proxy_triggers": proxy_rows}
+    _save_json(out_dir / "e15_knee_sensitivity_and_proxy.json", payload)
+    print("[E15] Done.", flush=True)
+    return payload
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run post-hoc Major Revision audits E7-E12.")
+    parser = argparse.ArgumentParser(description="Run post-hoc Major Revision audits E7-E15.")
     parser.add_argument("--old-data-dir", type=Path, default=_REPO_ROOT / "data")
     parser.add_argument("--new-data-dir", type=Path, default=None)
     parser.add_argument("--ext-data-dir", type=Path, default=None)
     parser.add_argument("--out-dir", type=Path, default=_REPO_ROOT / "revision_experiments")
-    parser.add_argument("--only", type=str, default="e7,e8,e9,e10,e11,e12")
+    parser.add_argument("--only", type=str, default="e7,e8,e9,e10,e11,e12,e13,e14,e15")
     args = parser.parse_args()
 
     old_dir = args.old_data_dir.resolve()
@@ -918,6 +1822,12 @@ def main() -> None:
         run_e11(datasets, out_dir)
     if "e12" in selected:
         run_e12(datasets, out_dir)
+    if "e13" in selected:
+        run_e13(datasets, ext_datasets, out_dir)
+    if "e14" in selected:
+        run_e14(datasets, ext_datasets, out_dir)
+    if "e15" in selected:
+        run_e15(datasets, ext_datasets, out_dir)
     print(f"MAJOR REVISION AUDITS ({','.join(sorted(selected))}) COMPLETE in {time.time() - t0:.2f}s", flush=True)
 
 
