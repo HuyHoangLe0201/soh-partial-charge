@@ -18,6 +18,12 @@ Raw `.mat` archives and prepared `.npz` files are **not redistributed** in this 
      - `Batch-5` (`XJTU_B5`, 8 cells): random walk with `2.0 A`/`2.0 A` RPTs (Stage-2 untouched confirmation)
      - `Batch-6` (`XJTU_B6`, 8 cells): `Sim_satellite` cycling with `2.0 A`/`1.0 A` RPTs (Stage-1 fresh confirmation)
 
+3. **CALCE Battery Data Set — CS2 Suite** (He et al., 2011; `10.1016/j.jpowsour.2011.08.040`)
+   - 4 prismatic $\mathrm{LiCoO_2}$/graphite cells (`CS2_35`, `CS2_36`, `CS2_37`, `CS2_38`) aged to deep SOH ($\ge 0.479$) under repeated $0.5\,\mathrm{C}$/$1\,\mathrm{C}$ cycling (post-hoc audit E7/E10).
+
+4. **Tongji University Dataset-3** (Zhu et al., 2022; `10.1038/s41467-022-29837-w`)
+   - 9 commercial 18650 NCM+NCA blended-cathode cells cycled at $25^\circ\mathrm{C}$ across $0.5\,\mathrm{C}/1\,\mathrm{C}$ (`TJU_1C`), $0.5\,\mathrm{C}/2\,\mathrm{C}$ (`TJU_2C`), and $0.5\,\mathrm{C}/4\,\mathrm{C}$ (`TJU_4C`) down to $\mathrm{SOH}\ge 0.662$ (post-hoc audit E7/E10).
+
 ---
 
 ## Expected `.npz` Array Schema & SHA-256 Hashes
@@ -53,11 +59,12 @@ Recorded SHA-256 digests of the 7 prepared `.npz` files used in the study:
 
 ## Expected Directory Layout
 
-Place all seven prepared `.npz` archives directly inside `data/`:
+Place the seven primary `.npz` archives directly inside `data/` (and optionally place external `.npz` archives for E7/E10 inside `data/` or pass `--ext-data-dir`):
 
 - `data/NASA.npz`
 - `data/XJTU_B1.npz`, `data/XJTU_B2.npz`, `data/XJTU_B3.npz`
 - `data/XJTU_B4.npz`, `data/XJTU_B5.npz`, `data/XJTU_B6.npz`
+- Optional external archives: `CALCE_*.npz` (`CALCE_CS2`), and `TJU_D3_CY25_05_{1,2,4}_*.npz` or `TJU_{1,2,4}C*.npz` (`TJU_1C`, `TJU_2C`, `TJU_4C`)
 
 To generate `XJTU_B4.npz`, `XJTU_B6.npz`, and `XJTU_B5.npz` from the downloaded raw XJTU Zenodo `.mat` folders (`Batch-4/`, `Batch-5/`, `Batch-6/`), run from the repository root:
 

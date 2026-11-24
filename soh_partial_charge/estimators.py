@@ -9,6 +9,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
+from scipy.stats import norm as _norm
+
 from src import reference_models as _ref
 from src import stage2_run as _s2
 
@@ -19,6 +21,13 @@ SEG_MIN = float(_ref.SEG_MIN)
 
 ArrayLike = Union[np.ndarray, Sequence[float]]
 _PRETRAINED_PATH = Path(__file__).resolve().parent / "pretrained_xjtu_b1.json"
+# Exact 99th-percentile source gate thresholds on frozen XJTU_B1 (reg_floor=1e-4)
+_B1_GATE_DEFAULTS: Dict[str, float] = {
+    "tau_d2": 8.393022872667578,
+    "tau_zpos": 0.051323988898317636,
+    "reg_floor": 1e-4,
+    "quantile": 0.99,
+}
 
 
 def _load_pretrained_payload() -> Dict[str, Any]:
@@ -201,6 +210,7 @@ class Stage1ResponseFilter:
     C_: Optional[np.ndarray] = None
     G_: Optional[np.ndarray] = None
     metadata_: Optional[Dict[str, Any]] = None
+    gate_thresholds_: Optional[Dict[str, float]] = None
 
     @classmethod
     def from_pretrained(cls, source: str = "XJTU_B1") -> "Stage1ResponseFilter":
@@ -219,6 +229,7 @@ class Stage1ResponseFilter:
             C_=np.asarray(p["C"], dtype=float),
             G_=np.asarray(p["G"], dtype=float),
             metadata_={"source": "XJTU_B1_frozen"},
+            gate_thresholds_=dict(_B1_GATE_DEFAULTS),
         )
 
     def fit_from_cells(self, cells: List[_ref.Cell]) -> "Stage1ResponseFilter":
@@ -238,6 +249,14 @@ class Stage1ResponseFilter:
         self.C_ = np.asarray(model["C"], dtype=float)
         self.G_ = np.asarray(model["G"], dtype=float)
         self.metadata_ = dict(model["optimizer"])
+        D_src, Dr_src = [], []
+        for c in cells:
+            rows = _ref._future_rows(c, exclude_anchor=True)
+            if rows.size > 0:
+                D_src.append(np.asarray(c.D["clean"][rows], dtype=float))
+                Dr_src.append(np.asarray(c.Dref["clean"], dtype=float))
+        if D_src:
+            self.calibrate_online_gate(D_src, Dr_src, quantile=0.99, reg_floor=1e-4)
         return self
 
     def fit(
@@ -322,6 +341,132 @@ class Stage1ResponseFilter:
                 diag["sign_inverted"] = bool(gamma_eff < 0.0)
         return diag
 
+    def oblique_projector_matrices(self, reg_floor: float = 1e-4) -> Tuple[np.ndarray, np.ndarray]:
+        """Compute complementary oblique projector P_perp = I - b w^T and precision S_perp^-1."""
+        w = self._require_fitted()
+        if self.b_ is None or self.C_ is None:
+            raise RuntimeError("Stage1ResponseFilter requires fitted b_ and C_ for projector diagnostics")
+        lam_perp = float(reg_floor)
+        if not math.isfinite(lam_perp) or lam_perp <= 0.0:
+            raise ValueError(f"reg_floor must be positive and finite, got {reg_floor}")
+        P_perp = np.eye(4, dtype=float) - np.outer(self.b_, w)
+        S_perp = P_perp @ self.C_ @ P_perp.T + lam_perp * np.eye(4, dtype=float)
+        S_perp_inv = np.linalg.inv(S_perp)
+        return P_perp, S_perp_inv
+
+    def calibrate_online_gate(
+        self,
+        D_source_cells: Sequence[ArrayLike],
+        D_ref_source_cells: Sequence[ArrayLike],
+        quantile: float = 0.99,
+        reg_floor: float = 1e-4,
+    ) -> Dict[str, float]:
+        """Calibrate label-free online gate thresholds strictly from source-cohort profiles."""
+        w = self._require_fitted()
+        if len(D_source_cells) != len(D_ref_source_cells) or not D_source_cells:
+            raise ValueError("D_source_cells and D_ref_source_cells must be non-empty of equal length")
+        q_val = float(quantile)
+        if not (0.0 < q_val < 1.0):
+            raise ValueError(f"quantile must be in (0, 1), got {quantile}")
+        P_perp, S_perp_inv = self.oblique_projector_matrices(reg_floor=reg_floor)
+        d2_list: List[float] = []
+        zhat_list: List[float] = []
+        for Dc_raw, Dr_raw in zip(D_source_cells, D_ref_source_cells):
+            Dc, _ = _as_2d_D(Dc_raw, "D_source_cells")
+            Dr = _as_1d_Dref(Dr_raw)
+            X = np.log(Dc / Dr[None, :])
+            r_perp = X @ P_perp.T
+            d2 = np.sum((r_perp @ S_perp_inv) * r_perp, axis=1)
+            d2_list.extend(d2.tolist())
+            zhat_list.extend((X @ w).tolist())
+        tau_d2 = float(np.percentile(d2_list, 100.0 * q_val))
+        tau_zpos = float(max(np.percentile(zhat_list, 100.0 * q_val), 0.01))
+        self.gate_thresholds_ = {
+            "tau_d2": tau_d2,
+            "tau_zpos": tau_zpos,
+            "reg_floor": float(reg_floor),
+            "quantile": q_val,
+        }
+        return dict(self.gate_thresholds_)
+
+    def predict_gated(
+        self,
+        D: ArrayLike,
+        D_ref: ArrayLike,
+        y_ref: float,
+        tau_d2: Optional[float] = None,
+        tau_zpos: Optional[float] = None,
+        polarity_tol: float = 0.01,
+        reg_floor: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Predict SOH with label-free oblique-projector domain screening and causal fallback."""
+        w = self._require_fitted()
+        D_arr, single = _as_2d_D(D, "D")
+        Dr = _as_1d_Dref(D_ref)
+        yr = float(y_ref)
+        if not math.isfinite(yr) or yr <= 0.0:
+            raise ValueError("y_ref must be positive and finite")
+        thresh = self.gate_thresholds_ or {}
+        td2 = float(tau_d2 if tau_d2 is not None else thresh.get("tau_d2", float("nan")))
+        tzp = float(tau_zpos if tau_zpos is not None else thresh.get("tau_zpos", float("nan")))
+        rfloor = float(reg_floor if reg_floor is not None else thresh.get("reg_floor", 1e-4))
+        if not (math.isfinite(td2) and math.isfinite(tzp)):
+            raise RuntimeError("Gate thresholds missing; call calibrate_online_gate() or pass tau_d2 and tau_zpos")
+
+        P_perp, S_perp_inv = self.oblique_projector_matrices(reg_floor=rfloor)
+        X = np.log(D_arr / Dr[None, :])
+        z_hat = X @ w
+        y_raw = yr * np.exp(z_hat)
+        r_perp = X @ P_perp.T
+        d2 = np.sum((r_perp @ S_perp_inv) * r_perp, axis=1)
+        polarity_flip = (X[:, 0] > float(polarity_tol)) & (
+            (X[:, 2] < -float(polarity_tol)) | (X[:, 3] < -float(polarity_tol))
+        )
+        alarm = (d2 > td2) | (z_hat > tzp) | polarity_flip
+
+        y_gated = np.empty_like(y_raw)
+        safe_y = yr
+        consec = 0
+        max_consec = 0
+        for idx in range(y_raw.size):
+            if bool(alarm[idx]):
+                y_gated[idx] = safe_y
+                consec += 1
+                if consec > max_consec:
+                    max_consec = consec
+            else:
+                y_gated[idx] = float(y_raw[idx])
+                safe_y = float(y_raw[idx])
+                consec = 0
+
+        alarm_frac = float(np.mean(alarm))
+        domain_incompat = bool(alarm_frac > 0.25)
+        rpt_flag = bool(domain_incompat or max_consec >= 3)
+        if single:
+            return {
+                "y_hat_raw": float(y_raw[0]),
+                "y_hat_gated": float(y_gated[0]),
+                "d2_perp": float(d2[0]),
+                "z_hat": float(z_hat[0]),
+                "polarity_flip": bool(polarity_flip[0]),
+                "alarm": bool(alarm[0]),
+                "alarm_fraction": alarm_frac,
+                "domain_incompatible": bool(alarm[0]),
+                "rpt_recalibration_triggered": bool(alarm[0]),
+            }
+        return {
+            "y_hat_raw": y_raw,
+            "y_hat_gated": y_gated,
+            "d2_perp": d2,
+            "z_hat": z_hat,
+            "polarity_flip": polarity_flip,
+            "alarm": alarm,
+            "alarm_fraction": alarm_frac,
+            "max_consecutive_alarms": int(max_consec),
+            "domain_incompatible": domain_incompat,
+            "rpt_recalibration_triggered": rpt_flag,
+        }
+
 
 @dataclass
 class Stage2RankOneUpdater:
@@ -337,6 +482,7 @@ class Stage2RankOneUpdater:
     Sigma_: Optional[np.ndarray] = None
     sigma2_: Optional[float] = None
     beta_post_: Optional[np.ndarray] = None
+    Sigma_post_: Optional[np.ndarray] = None
     last_update_diagnostics_: Optional[Dict[str, Any]] = None
 
     @classmethod
@@ -358,6 +504,7 @@ class Stage2RankOneUpdater:
         self.Sigma_ = np.asarray(stats["Sigma"], dtype=float)
         self.sigma2_ = float(stats["sigma2"])
         self.beta_post_ = None
+        self.Sigma_post_ = None
         self.last_update_diagnostics_ = None
         return self
 
@@ -402,23 +549,150 @@ class Stage2RankOneUpdater:
             raise FloatingPointError("Non-positive MAP denominator")
 
         err_a = za - float(xa @ beta0)
-        delta_beta = (Sigma @ xa) * (err_a / denom)
+        sx = Sigma @ xa
+        delta_beta = sx * (err_a / denom)
         beta_star = beta0 + delta_beta
+        Sigma_post = Sigma - np.outer(sx, sx) / denom
         n_eff = float(q / nu) if nu > 0.0 else float("inf")
         maha_norm = float((math.sqrt(max(q, 0.0)) * abs(err_a)) / denom)
+        zeta_a = float(abs(err_a) / math.sqrt(denom))
 
         self.beta_post_ = beta_star
+        self.Sigma_post_ = Sigma_post
         self.last_update_diagnostics_ = {
             "beta_post": beta_star.tolist(),
             "prior_leverage_q": q,
             "noise_variance_nu": nu,
             "n_eff_leverage_ratio": n_eff,
             "prior_residual_za_minus_xa_beta0": float(err_a),
+            "standardized_innovation_zeta": zeta_a,
             "step_l2_norm": float(np.linalg.norm(delta_beta)),
             "step_mahalanobis_norm": maha_norm,
             "low_leverage_shrinkage_warning": bool(n_eff < 0.1),
         }
         return dict(self.last_update_diagnostics_)
+
+    def posterior_covariance(self, D_cal: ArrayLike, D_ref: ArrayLike) -> np.ndarray:
+        """Compute closed-form rank-one posterior weight covariance Sigma_post."""
+        _, Sigma, sigma2 = self._require_prior()
+        Dc = _as_1d_Dref(D_cal)
+        Dr = _as_1d_Dref(D_ref)
+        xa = np.log(Dc / Dr)
+        nu = float(self.t) * sigma2
+        denom = nu + float(xa @ Sigma @ xa)
+        if denom <= 0.0 or not math.isfinite(denom):
+            raise FloatingPointError("Non-positive posterior covariance denominator")
+        sx = Sigma @ xa
+        return Sigma - np.outer(sx, sx) / denom
+
+    def predict_interval(
+        self,
+        D: ArrayLike,
+        D_ref: ArrayLike,
+        D_cal: Optional[ArrayLike] = None,
+        y_cal: Optional[float] = None,
+        y_ref: Optional[float] = None,
+        level: float = 0.95,
+        include_t_scale: bool = True,
+    ) -> Dict[str, Any]:
+        """Compute posterior point predictions and log-normal Bayesian credible intervals."""
+        beta0, Sigma, sigma2 = self._require_prior()
+        lv = float(level)
+        if not (0.0 < lv < 1.0):
+            raise ValueError(f"level must lie in (0, 1), got {level}")
+        if D_cal is not None:
+            if y_cal is None or y_ref is None:
+                raise ValueError("y_cal and y_ref are required when D_cal is supplied")
+            self.update_weights(D_cal, D_ref, y_cal, y_ref)
+
+        beta = self.beta_post_ if self.beta_post_ is not None else beta0
+        Sigma_use = self.Sigma_post_ if self.Sigma_post_ is not None else Sigma
+        D_arr, single = _as_2d_D(D, "D")
+        Dr = _as_1d_Dref(D_ref)
+        X = np.log(D_arr / Dr[None, :])
+        mu = X @ beta
+        ep_var = np.maximum(np.sum((X @ Sigma_use) * X, axis=1), 0.0)
+        obs_var = float(self.t) * sigma2 if include_t_scale else sigma2
+        log_sd = np.sqrt(ep_var + obs_var)
+        z_crit = float(_norm.ppf(0.5 * (1.0 + lv)))
+        pred = np.exp(mu)
+        lower = np.exp(mu - z_crit * log_sd)
+        upper = np.exp(mu + z_crit * log_sd)
+        zeta_a = (
+            float(self.last_update_diagnostics_["standardized_innovation_zeta"])
+            if self.last_update_diagnostics_ is not None
+            else None
+        )
+        if single:
+            return {
+                "pred": float(pred[0]),
+                "lower": float(lower[0]),
+                "upper": float(upper[0]),
+                "log_sd": float(log_sd[0]),
+                "standardized_innovation_zeta": zeta_a,
+            }
+        return {
+            "pred": pred,
+            "lower": lower,
+            "upper": upper,
+            "log_sd": log_sd,
+            "standardized_innovation_zeta": zeta_a,
+        }
+
+    def select_post_rebound_anchor_online(
+        self,
+        D_seq: ArrayLike,
+        D_ref: ArrayLike,
+        fade_threshold: Optional[float] = None,
+        consecutive: int = 2,
+        min_pos: int = 3,
+        max_pos: int = 15,
+        signal: str = "endpoint",
+    ) -> int:
+        """Select calibration landmark index causally without future peeking.
+
+        Parameters
+        ----------
+        signal : {'endpoint', 'high_voltage', 'prior'}
+            Unlabeled monitor trace:
+            - ``'endpoint'`` tracks total partial-charge log-ratio log(sum D_t / sum D_ref)
+              (monotonic under half-rate cycling where ``X_t^T beta0`` can invert);
+            - ``'high_voltage'`` tracks upper segment log-ratio log(D_{t,3} / D_{ref,3});
+            - ``'prior'`` tracks source prior projection log(D_t / D_ref) @ beta0.
+        """
+        beta0, _, _ = self._require_prior()
+        D_arr, single = _as_2d_D(D_seq, "D_seq")
+        if single or D_arr.shape[0] < 2:
+            raise ValueError("D_seq must contain at least 2 chronological future profiles")
+        Dr = _as_1d_Dref(D_ref)
+        consec = int(consecutive)
+        if consec < 1:
+            raise ValueError("consecutive must be >= 1")
+        sig_mode = str(signal).lower()
+        if sig_mode == "endpoint":
+            trace = np.log(np.sum(D_arr, axis=1) / float(np.sum(Dr)))
+            default_thr = -0.075
+        elif sig_mode == "high_voltage":
+            trace = np.log(D_arr[:, 3] / float(Dr[3]))
+            default_thr = -0.025
+        elif sig_mode == "prior":
+            trace = np.log(D_arr / Dr[None, :]) @ beta0
+            default_thr = -0.020
+        else:
+            raise ValueError(f"signal must be 'endpoint', 'high_voltage', or 'prior'; got {signal!r}")
+        thr = float(default_thr if fade_threshold is None else fade_threshold)
+        max_valid = D_arr.shape[0] - 2
+        hi = min(int(max_pos), max_valid)
+        lo = min(max(consec - 1, int(min_pos)), max_valid)
+        run = 0
+        for idx in range(0, hi + 1):
+            if float(trace[idx]) < thr:
+                run += 1
+            else:
+                run = 0
+            if idx >= int(min_pos) and run >= consec:
+                return int(idx)
+        return int(max(lo, hi))
 
     def predict_relative(
         self,

@@ -1,0 +1,6 @@
+component,params_float32,flash_bytes_f32,sram_bytes_f32,flops_per_cycle,python_api_median_us,python_api_iqr_us,vector_kernel_median_us
+Stage-1 Primary Filter,9,36,64,17,43.08935000153724,20.603700017090887,3.879879997111857
+Stage-1 + Projector Gate,43,172,128,75,120.15906667026381,12.58733333088459,
+Stage-2 Rank-One MAP (update),32,128,192,92,60.71433333757644,7.811066655752562,
+Stage-2 Predict + 95% Interval,32,128,192,64,172.9654999799095,23.040000000037253,
+"HistGB (200 trees, 31 leaves)",48800,195200,1024,1200,2854.0834999876097,388.8628749700729,

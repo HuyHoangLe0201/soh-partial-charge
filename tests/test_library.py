@@ -141,6 +141,72 @@ class TestLibraryAndManifests(unittest.TestCase):
             f2["code_sha256"]["stage2_spec.txt"],
         )
 
+    def test_oblique_projector_duality_and_online_gate(self) -> None:
+        s1 = Stage1ResponseFilter.from_pretrained("XJTU_B1")
+        P_perp, S_perp_inv = s1.oblique_projector_matrices(reg_floor=1e-4)
+        P_par = np.outer(s1.b_, s1.w_)
+        # Idempotence and source-slope annihilation
+        self.assertTrue(np.allclose(P_par @ P_par, P_par, atol=1e-12))
+        self.assertTrue(np.allclose(P_perp @ P_perp, P_perp, atol=1e-12))
+        self.assertLess(float(np.linalg.norm(P_perp @ s1.b_)), 1e-12)
+        self.assertTrue(np.allclose(S_perp_inv, S_perp_inv.T, atol=1e-10))
+
+        # In-domain synthetic trajectory vs sign-inverted (B6-like) trajectory
+        D_ref = np.array([0.45, 0.35, 0.25, 0.15])
+        y_ref = 0.96
+        z_in = np.linspace(-0.02, -0.15, 6)
+        D_in = D_ref[None, :] * np.exp(z_in[:, None] * s1.b_[None, :])
+        res_in = s1.predict_gated(D_in, D_ref, y_ref)
+        self.assertFalse(bool(res_in["domain_incompatible"]))
+        self.assertFalse(bool(res_in["rpt_recalibration_triggered"]))
+        self.assertTrue(np.allclose(res_in["y_hat_gated"], res_in["y_hat_raw"], atol=1e-12))
+
+        b_inv = np.array([-2.2, 0.0, 0.9, 1.0])
+        D_inv = D_ref[None, :] * np.exp(z_in[:, None] * b_inv[None, :])
+        res_inv = s1.predict_gated(D_inv, D_ref, y_ref)
+        self.assertTrue(bool(res_inv["domain_incompatible"]))
+        self.assertTrue(bool(res_inv["rpt_recalibration_triggered"]))
+        self.assertTrue(bool(np.all(res_inv["polarity_flip"])))
+        self.assertTrue(bool(np.all(res_inv["alarm"])))
+        self.assertTrue(np.allclose(res_inv["y_hat_gated"], y_ref, atol=1e-12))
+
+    def test_stage2_posterior_intervals_and_causal_rebound_selector(self) -> None:
+        s2 = Stage2RankOneUpdater.from_pretrained()
+        D_ref = np.array([0.45, 0.35, 0.25, 0.15])
+        D_cal = np.array([0.43, 0.36, 0.255, 0.145])
+        D_fut = np.array([[0.41, 0.37, 0.26, 0.14], [0.39, 0.38, 0.265, 0.135]])
+        Sigma_post = s2.posterior_covariance(D_cal, D_ref)
+        eigs = np.linalg.eigvalsh(Sigma_post)
+        self.assertTrue(bool(np.all(eigs > 0.0)))
+
+        iv = s2.predict_interval(D_fut, D_ref, D_cal=D_cal, y_cal=0.91, y_ref=0.94, level=0.95)
+        self.assertTrue(bool(np.all(iv["lower"] < iv["pred"])))
+        self.assertTrue(bool(np.all(iv["pred"] < iv["upper"])))
+        self.assertIsNotNone(iv["standardized_innovation_zeta"])
+
+        # Rebound followed by fade past thresholds -> causal invariance check (prior & endpoint signals)
+        z_traj = np.array([0.02, 0.03, 0.01, -0.01, -0.03, -0.05, -0.07, -0.09])
+        step_dir = s2.beta0_ / float(s2.beta0_ @ s2.beta0_)
+        D_seq = D_ref[None, :] * np.exp(z_traj[:, None] * step_dir[None, :])
+        idx_full = s2.select_post_rebound_anchor_online(
+            D_seq, D_ref, fade_threshold=-0.02, consecutive=2, min_pos=3, max_pos=9, signal="prior"
+        )
+        self.assertEqual(idx_full, 5)
+        idx_prefix = s2.select_post_rebound_anchor_online(
+            D_seq[:7], D_ref, fade_threshold=-0.02, consecutive=2, min_pos=3, max_pos=9, signal="prior"
+        )
+        self.assertEqual(idx_prefix, idx_full)
+
+        # Endpoint drop signal causal invariance check
+        u_traj = np.array([-0.03, -0.05, -0.06, -0.06, -0.08, -0.09, -0.10, -0.11])
+        D_end = D_ref[None, :] * np.exp(u_traj[:, None])
+        end_full = s2.select_post_rebound_anchor_online(D_end, D_ref, signal="endpoint", max_pos=15)
+        self.assertEqual(end_full, 5)
+        self.assertEqual(
+            s2.select_post_rebound_anchor_online(D_end[:7], D_ref, signal="endpoint", max_pos=15),
+            end_full,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

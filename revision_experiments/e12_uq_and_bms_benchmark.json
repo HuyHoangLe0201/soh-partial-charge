@@ -1,0 +1,127 @@
+{
+  "uq_coverage": [
+    {
+      "cohort": "XJTU_B1_LOCO",
+      "n_cells": 8,
+      "cov90_sigma2_pct": 92.80301615352708,
+      "cov95_sigma2_pct": 96.18630364777341,
+      "width95_sigma2_pp": 6.739525204444117,
+      "cov90_nu_pct": 91.83173704209788,
+      "cov95_nu_pct": 95.93813738344988,
+      "width95_nu_pp": 10.379648298898452
+    },
+    {
+      "cohort": "XJTU_B1",
+      "n_cells": 8,
+      "cov90_sigma2_pct": 95.43200380982266,
+      "cov95_sigma2_pct": 98.69523531250725,
+      "width95_sigma2_pp": 6.893139647364274,
+      "cov90_nu_pct": 99.84118529040404,
+      "cov95_nu_pct": 100.0,
+      "width95_nu_pp": 15.415314713528485
+    },
+    {
+      "cohort": "XJTU_B3",
+      "n_cells": 8,
+      "cov90_sigma2_pct": 80.23304923059025,
+      "cov95_sigma2_pct": 87.42099549267283,
+      "width95_sigma2_pp": 7.5380204840198335,
+      "cov90_nu_pct": 96.02581646291108,
+      "cov95_nu_pct": 97.94629886561623,
+      "width95_nu_pp": 15.693084422345866
+    },
+    {
+      "cohort": "XJTU_B4",
+      "n_cells": 8,
+      "cov90_sigma2_pct": 61.41968778784821,
+      "cov95_sigma2_pct": 74.45962322691526,
+      "width95_sigma2_pp": 6.338466401922308,
+      "cov90_nu_pct": 93.79397553970314,
+      "cov95_nu_pct": 95.3217495408576,
+      "width95_nu_pp": 15.074229825105864
+    },
+    {
+      "cohort": "XJTU_B5",
+      "n_cells": 8,
+      "cov90_sigma2_pct": 34.60074738857634,
+      "cov95_sigma2_pct": 43.6427059782323,
+      "width95_sigma2_pp": 5.533447837780125,
+      "cov90_nu_pct": 69.88504916136495,
+      "cov95_nu_pct": 73.68983812240391,
+      "width95_nu_pp": 15.076135087645046
+    },
+    {
+      "cohort": "XJTU_B2",
+      "n_cells": 15,
+      "cov90_sigma2_pct": 34.55573876110209,
+      "cov95_sigma2_pct": 38.128443094116676,
+      "width95_sigma2_pp": 11.422038085826273,
+      "cov90_nu_pct": 48.9487404319769,
+      "cov95_nu_pct": 51.588662833294165,
+      "width95_nu_pp": 18.986196893506705
+    },
+    {
+      "cohort": "XJTU_B6",
+      "n_cells": 8,
+      "cov90_sigma2_pct": 3.5082409462340536,
+      "cov95_sigma2_pct": 4.099801884857749,
+      "width95_sigma2_pp": 8.189005988844077,
+      "cov90_nu_pct": 15.538645680860801,
+      "cov95_nu_pct": 21.856644243786082,
+      "width95_nu_pp": 17.753006331895257
+    }
+  ],
+  "bms_footprint": [
+    {
+      "component": "Stage-1 Primary Filter",
+      "params_float32": 9,
+      "flash_bytes_f32": 36,
+      "sram_bytes_f32": 64,
+      "flops_per_cycle": 17,
+      "python_api_median_us": 43.08935000153724,
+      "python_api_iqr_us": 20.603700017090887,
+      "vector_kernel_median_us": 3.879879997111857
+    },
+    {
+      "component": "Stage-1 + Projector Gate",
+      "params_float32": 43,
+      "flash_bytes_f32": 172,
+      "sram_bytes_f32": 128,
+      "flops_per_cycle": 75,
+      "python_api_median_us": 120.15906667026381,
+      "python_api_iqr_us": 12.58733333088459,
+      "vector_kernel_median_us": null
+    },
+    {
+      "component": "Stage-2 Rank-One MAP (update)",
+      "params_float32": 32,
+      "flash_bytes_f32": 128,
+      "sram_bytes_f32": 192,
+      "flops_per_cycle": 92,
+      "python_api_median_us": 60.71433333757644,
+      "python_api_iqr_us": 7.811066655752562,
+      "vector_kernel_median_us": null
+    },
+    {
+      "component": "Stage-2 Predict + 95% Interval",
+      "params_float32": 32,
+      "flash_bytes_f32": 128,
+      "sram_bytes_f32": 192,
+      "flops_per_cycle": 64,
+      "python_api_median_us": 172.9654999799095,
+      "python_api_iqr_us": 23.040000000037253,
+      "vector_kernel_median_us": null
+    },
+    {
+      "component": "HistGB (200 trees, 31 leaves)",
+      "params_float32": 48800,
+      "flash_bytes_f32": 195200,
+      "sram_bytes_f32": 1024,
+      "flops_per_cycle": 1200,
+      "python_api_median_us": 2854.0834999876097,
+      "python_api_iqr_us": 388.8628749700729,
+      "vector_kernel_median_us": null
+    }
+  ],
+  "histgb_nodes": 12200
+}
