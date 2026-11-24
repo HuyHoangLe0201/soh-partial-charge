@@ -223,8 +223,15 @@ class Stage1ResponseFilter:
 
     def fit_from_cells(self, cells: List[_ref.Cell]) -> "Stage1ResponseFilter":
         """Fit directly from a list of ``Cell`` objects loaded via ``load_cells``."""
+        kappa = float(self.kappa)
+        if not math.isfinite(kappa) or kappa <= 0.0:
+            raise ValueError(f"kappa must be positive and finite, got {self.kappa}")
         gam = 0.0 if (self.gamma == 0.0) else float(self.gamma)
         model = _ref._fit_response(cells, float(self.lam), gam, float(self.eta), mode="calibrated")
+        if kappa != float(_ref.KAPPA_DEFAULT):
+            qp = _ref._response_qp(np.asarray(model["A"], dtype=float), np.asarray(model["b"], dtype=float), kappa)
+            model["w"] = qp["w"]
+            model["optimizer"] = qp
         self.w_ = np.asarray(model["w"], dtype=float)
         self.b_ = np.asarray(model["b"], dtype=float)
         self.B_ = np.asarray(model["B"], dtype=float)

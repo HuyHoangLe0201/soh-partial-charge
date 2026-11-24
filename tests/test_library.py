@@ -93,6 +93,30 @@ class TestLibraryAndManifests(unittest.TestCase):
         preds = s1.predict(D_ext[1:], D_ext[0], float(y_all[0]))
         self.assertTrue(np.allclose(preds, y_all[1:], atol=1e-5))
 
+    def test_custom_kappa_bound(self) -> None:
+        rng = np.random.default_rng(7)
+        y_all = np.linspace(0.96, 0.78, 12)
+        z = np.log(y_all[1:] / y_all[0])
+        d_base = np.array([0.44, 0.34, 0.26, 0.16])
+        b_true = np.array([0.40, -1.10, -0.50, 0.10])
+        D_cells = [d_base * np.exp(z[:, None] * b_true[None, :] + rng.normal(0.0, 0.015, size=(z.size, 4))) for _ in range(3)]
+        y_cells = [y_all[1:] for _ in range(3)]
+        D_refs = [d_base for _ in range(3)]
+        y_refs = [float(y_all[0]) for _ in range(3)]
+
+        s1_wide = Stage1ResponseFilter(lam=1e-6, gamma=0.0, eta=0.0, kappa=5.0).fit(D_cells, y_cells, D_refs, y_refs)
+        wide_l1 = float(np.sum(np.abs(s1_wide.w_)))
+        min_feasible_l1 = 1.0 / float(np.max(np.abs(s1_wide.b_)))
+        tight_kappa = 0.5 * (min_feasible_l1 + wide_l1)
+        self.assertGreater(wide_l1, tight_kappa)
+        self.assertGreater(tight_kappa * float(np.max(np.abs(s1_wide.b_))), 1.0)
+
+        s1_tight = Stage1ResponseFilter(lam=1e-6, gamma=0.0, eta=0.0, kappa=tight_kappa).fit(
+            D_cells, y_cells, D_refs, y_refs
+        )
+        self.assertLessEqual(float(np.sum(np.abs(s1_tight.w_))), tight_kappa + 1e-6)
+        self.assertAlmostEqual(float(s1_tight.b_ @ s1_tight.w_), 1.0, places=6)
+
     def test_freeze_code_hashes_consistent(self) -> None:
         f1 = json.loads((REPO_ROOT / "frozen_manifests" / "stage1_config_freeze.json").read_text(encoding="utf-8"))
         self.assertEqual(
